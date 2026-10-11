@@ -1,0 +1,1 @@
+# TP_Computacao_Distribuida_02_Semestre_2026
