@@ -11,11 +11,14 @@ import br.pucminas.cd.aco.election.LeaderMonitor;
 import br.pucminas.cd.aco.mutex.RicartAgrawala;
 import br.pucminas.cd.aco.round.RoundCoordinator;
 import br.pucminas.cd.aco.round.RoundWorker;
+import br.pucminas.cd.aco.rpc.ClusterAuth;
 import br.pucminas.cd.aco.rpc.NodeServiceImpl;
 import br.pucminas.cd.aco.rpc.PeerNetwork;
 import br.pucminas.cd.aco.util.Log;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.ServerInterceptors;
+import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.nio.file.Path;
 
 /** Ponto de entrada de um nó. Todos os nós rodam este mesmo programa. */
@@ -32,7 +35,7 @@ public final class NodeMain {
         double nearestNeighbor = tsp.nearestNeighborLength();
         Log.info("TSP com %d cidades; vizinho mais próximo = %.0f", tsp.size(), nearestNeighbor);
 
-        PeerNetwork network = new PeerNetwork(cfg.nodeId(), clock, cfg.peers());
+        PeerNetwork network = new PeerNetwork(cfg.nodeId(), clock, cfg.peers(), cfg.clusterToken());
         BullyElection election = new BullyElection(cfg.nodeId(), network);
         RicartAgrawala mutex = new RicartAgrawala(cfg.nodeId(), clock, network);
 
@@ -49,8 +52,12 @@ public final class NodeMain {
             if (leader == cfg.nodeId()) coordinator.onBecameLeader();
         });
 
+        NodeServiceImpl service = new NodeServiceImpl(clock, network, election, mutex, worker, coordinator);
         Server server = ServerBuilder.forPort(cfg.port())
-                .addService(new NodeServiceImpl(clock, network, election, mutex, worker, coordinator))
+                .addService(ServerInterceptors.intercept(service,
+                        // Repassa Status lançados nos handlers (ex.: PERMISSION_DENIED) em vez de UNKNOWN
+                        TransmitStatusRuntimeExceptionInterceptor.instance(),
+                        ClusterAuth.serverInterceptor(cfg.clusterToken())))
                 .build()
                 .start();
         Log.info("N%d ouvindo na porta %d; peers = %s", cfg.nodeId(), cfg.port(), cfg.peers());

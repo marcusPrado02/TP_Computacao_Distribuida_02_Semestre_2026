@@ -17,6 +17,7 @@ import br.pucminas.cd.aco.grpc.RoundStart;
 import br.pucminas.cd.aco.mutex.RicartAgrawala;
 import br.pucminas.cd.aco.round.RoundSink;
 import br.pucminas.cd.aco.round.RoundWorker;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -98,8 +99,13 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
         ack(obs);
     }
 
-    /** Regra de recebimento do Lamport. @return id do remetente */
+    /** Valida o remetente e aplica a regra de recebimento do Lamport. @return id do remetente */
     private int receive(Header header) {
+        if (!network.allPeers().contains(header.getSenderId())) {
+            throw Status.PERMISSION_DENIED
+                    .withDescription("remetente desconhecido: N" + header.getSenderId())
+                    .asRuntimeException();
+        }
         clock.onReceive(header.getLamport());
         return header.getSenderId();
     }

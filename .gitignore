@@ -2,6 +2,9 @@ target/
 *.class
 *.log
 
+# Segredos locais (token do cluster)
+.env
+
 # IDEs
 .idea/
 *.iml

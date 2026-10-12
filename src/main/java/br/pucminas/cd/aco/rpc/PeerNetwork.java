@@ -49,13 +49,14 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     private final Set<Integer> alive = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
-    public PeerNetwork(int selfId, LamportClock clock, Map<Integer, String> peers) {
+    public PeerNetwork(int selfId, LamportClock clock, Map<Integer, String> peers, String clusterToken) {
         this.selfId = selfId;
         this.clock = clock;
         peers.forEach((id, address) -> {
             ManagedChannel channel = ManagedChannelBuilder.forTarget(address).usePlaintext().build();
             channels.put(id, channel);
-            stubs.put(id, NodeServiceGrpc.newBlockingStub(channel));
+            stubs.put(id, NodeServiceGrpc.newBlockingStub(channel)
+                    .withInterceptors(ClusterAuth.clientInterceptor(clusterToken)));
             alive.add(id);
         });
     }

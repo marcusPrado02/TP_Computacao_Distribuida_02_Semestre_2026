@@ -66,6 +66,7 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 
 ### 5.1 RPC — gRPC
 - Um único serviço `NodeService`; cliente em `rpc/PeerNetwork`, servidor em `rpc/NodeServiceImpl`.
+- **Autenticação:** token compartilhado (`CLUSTER_TOKEN`) no header `x-cluster-token`, verificado por um `ServerInterceptor` (`rpc/ClusterAuth`). Sem ele, `UNAUTHENTICATED`. O `sender_id` também precisa estar em `PEERS`; caso contrário, `PERMISSION_DENIED`.
 - Toda chamada tem *deadline* (500 ms; 2 s para o broadcast da matriz). Falha → peer marcado como inacessível.
 
 ### 5.2 Eleição de líder — Bully (`election/`)
@@ -93,7 +94,8 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 - Se o nó morrer **dentro** da SC, os pedidos adiados para ele ficam sem resposta e os outros travam.
 - Rodada perdida na troca de líder é pulada (o novo líder segue de `lastRound + 1`).
 - Réplicas da matriz não têm versão: um nó que volta depois de cair recomeça com a matriz inicial.
-- Tudo isso é tratamento de falhas / controle de réplicas: escopo da Entrega 2.
+- Segurança: sem TLS, o token trafega em claro na LAN. Um membro com o token ainda consegue forjar o `sender_id` de outro membro. A solução completa é mTLS com um certificado por nó.
+- Os itens de falha/réplica acima são tratamento de falhas / controle de réplicas: escopo da Entrega 2.
 
 ## 7. Parâmetros (variáveis de ambiente)
 
@@ -102,6 +104,7 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 | `NODE_ID` | — (obrigatória) | id único; maior id vence a eleição |
 | `NODE_PORT` | 50051 | porta gRPC |
 | `PEERS` | "" | `id=host:porta` separados por vírgula |
+| `CLUSTER_TOKEN` | — (obrigatória) | segredo compartilhado do cluster |
 | `TSP_FILE` | — | arquivo TSPLIB (sobrepõe `TSP_CITIES`) |
 | `TSP_CITIES` / `TSP_SEED` | 60 / 42 | instância aleatória (igual em todos os nós) |
 | `ROUNDS` / `ANTS` | 30 / 40 | rodadas totais / formigas por nó por rodada |

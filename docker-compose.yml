@@ -1,5 +1,6 @@
 # 4 nós simétricos na mesma rede Docker. Os nomes de serviço viram hostnames.
 # Demo de falha do líder:  docker compose stop node4
+# Antes de subir: cp .env.example .env  e troque CLUSTER_TOKEN.
 x-node: &node
   build: .
   image: aco-node:latest
@@ -7,6 +8,7 @@ x-node: &node
 
 x-env: &env
   NODE_PORT: "50051"
+  CLUSTER_TOKEN: "${CLUSTER_TOKEN:?defina CLUSTER_TOKEN no arquivo .env}"
   TSP_CITIES: "60"
   TSP_SEED: "42"
   ROUNDS: "30"
