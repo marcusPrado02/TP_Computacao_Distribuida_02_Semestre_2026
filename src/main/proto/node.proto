@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package aco;
+
+option java_multiple_files = true;
+option java_package = "br.pucminas.cd.aco.grpc";
+option java_outer_classname = "NodeProto";
+
+// Serviço único exposto por todos os nós (os nós são simétricos:
+// qualquer um pode ser eleito líder).
+service NodeService {
+  // --- Eleição de líder (Bully) ---
+  rpc Election(ElectionMsg) returns (ElectionReply);
+  rpc Coordinator(CoordinatorMsg) returns (Ack);
+  rpc Heartbeat(HeartbeatMsg) returns (Ack);
+
+  // --- Exclusão mútua (Ricart-Agrawala) ---
+  rpc RequestCS(CsRequest) returns (Ack);
+  rpc ReplyCS(CsReply) returns (Ack);
+
+  // --- Rodadas do ACO ---
+  rpc StartRound(RoundStart) returns (Ack);
+  rpc RoundDone(RoundResult) returns (Ack);
+  rpc UpdatePheromone(PheromoneUpdate) returns (Ack);
+}
+
+// Presente em toda mensagem: quem enviou e o relógio de Lamport no envio.
+message Header {
+  int32 sender_id = 1;
+  int64 lamport = 2;
+}
+
+message Ack {
+  Header header = 1;
+}
+
+message ElectionMsg {
+  Header header = 1;
+}
+
+// ok = true significa "tenho id maior e estou vivo; deixa comigo".
+message ElectionReply {
+  Header header = 1;
+  bool ok = 2;
+}
+
+message CoordinatorMsg {
+  Header header = 1;
+  int32 leader_id = 2;
+}
+
+message HeartbeatMsg {
+  Header header = 1;
+}
+
+// request_ts é o timestamp de Lamport do pedido (fixo durante toda a espera),
+// diferente de header.lamport, que muda a cada envio.
+message CsRequest {
+  Header header = 1;
+  int64 request_ts = 2;
+}
+
+message CsReply {
+  Header header = 1;
+}
+
+message RoundStart {
+  Header header = 1;
+  int32 round = 2;
+}
+
+// Melhor rota encontrada pelas formigas do nó nesta rodada.
+message RoundResult {
+  Header header = 1;
+  int32 round = 2;
+  repeated int32 tour = 3;
+  double length = 4;
+}
+
+// Matriz de feromônio completa (n*n, row-major) após a atualização feita
+// dentro da seção crítica, mais a melhor rota global conhecida pelo remetente.
+message PheromoneUpdate {
+  Header header = 1;
+  int32 round = 2;
+  repeated double tau = 3;
+  repeated int32 best_tour = 4;
+  double best_length = 5;
+}
