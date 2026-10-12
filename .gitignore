@@ -1,0 +1,23 @@
+target/
+dependency-reduced-pom.xml
+*.class
+*.log
+
+# Segredos locais (token do cluster)
+.env
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# LaTeX (relatório)
+relatorio/*.aux
+relatorio/*.bbl
+relatorio/*.blg
+relatorio/*.log
+relatorio/*.out
+relatorio/*.synctex.gz
