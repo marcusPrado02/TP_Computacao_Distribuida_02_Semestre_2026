@@ -16,8 +16,8 @@ Colônia de Formigas (ACO) resolvendo o Caixeiro-Viajante em vários nós Java q
 ## Build e testes
 
 ```bash
-mvn test              # testes unitários
-mvn package           # gera target/aco-node.jar
+mvn test              # testes unitários + integração (3 nós gRPC na mesma JVM, ~10 s)
+mvn clean package     # gera target/aco-node.jar
 ```
 
 ## Token do cluster
@@ -29,6 +29,9 @@ Gere um token por grupo e **não o versione**:
 cp .env.example .env
 sed -i "s/troque-este-token/$(openssl rand -hex 16)/" .env
 ```
+
+> Se o VS Code (extensão Java) estiver aberto, ele também compila em `target/`.
+> Use `mvn clean package` antes de rodar o JAR para não empacotar classes desatualizadas.
 
 ## Rodar com Docker Compose (4 nós)
 
@@ -57,7 +60,7 @@ NODE_ID=1 PEERS="2=192.168.0.12:50051,3=192.168.0.13:50051,4=192.168.0.14:50051"
 ```
 
 Todos os nós precisam usar os mesmos `TSP_SEED`/`TSP_CITIES` (ou o mesmo `TSP_FILE`).
-Os demais parâmetros estão em `docs/ARQUITETURA.md` §7.
+Os demais parâmetros estão em `docs/ARQUITETURA.md` §8.
 
 ## Lendo os logs
 
@@ -72,7 +75,8 @@ Os demais parâmetros estão em `docs/ARQUITETURA.md` §7.
 ```
 src/main/proto/node.proto         contrato gRPC
 src/main/java/br/pucminas/cd/aco/
-  NodeMain.java                   montagem do nó
+  NodeMain.java                   ponto de entrada (lê env, trata desligamento)
+  Node.java                       montagem e ciclo de vida do nó
   config/   rpc/                  configuração · cliente/servidor gRPC
   clock/                          relógio de Lamport
   election/                       Bully + monitor de líder

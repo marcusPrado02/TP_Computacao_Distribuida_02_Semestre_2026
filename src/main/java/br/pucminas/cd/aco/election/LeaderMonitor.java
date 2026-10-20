@@ -6,14 +6,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /** Detector de falha simples: heartbeat no líder a cada 1 s; 3 falhas seguidas disparam eleição. */
-public final class LeaderMonitor {
+public final class LeaderMonitor implements AutoCloseable {
     private static final int MAX_MISSES = 3;
 
     private final int selfId;
     private final BullyElection election;
     private final ElectionTransport transport;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private int misses;
+    private int misses; // só acessado pela thread do scheduler
 
     public LeaderMonitor(int selfId, BullyElection election, ElectionTransport transport) {
         this.selfId = selfId;
@@ -23,6 +23,11 @@ public final class LeaderMonitor {
 
     public void start() {
         scheduler.scheduleAtFixedRate(this::check, 1, 1, TimeUnit.SECONDS);
+    }
+
+    @Override
+    public void close() {
+        scheduler.shutdownNow();
     }
 
     private void check() {

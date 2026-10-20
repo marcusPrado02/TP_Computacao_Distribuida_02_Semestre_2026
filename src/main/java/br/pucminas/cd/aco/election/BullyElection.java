@@ -6,6 +6,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 
 /**
@@ -17,7 +18,7 @@ import java.util.function.IntConsumer;
  *   <li>Se alguém responde OK, espera o COORDINATOR; se não chegar, recomeça.</li>
  * </ol>
  */
-public final class BullyElection {
+public final class BullyElection implements AutoCloseable {
     private static final long COORDINATOR_TIMEOUT_MS = 3_000;
 
     private final int selfId;
@@ -27,7 +28,7 @@ public final class BullyElection {
     private final List<IntConsumer> listeners = new CopyOnWriteArrayList<>();
     private final Object lock = new Object();
 
-    private volatile int leaderId = -1;
+    private final AtomicInteger leaderId = new AtomicInteger(-1);
     private boolean coordinatorSeen; // protegido por lock
 
     public BullyElection(int selfId, ElectionTransport transport) {
@@ -39,12 +40,13 @@ public final class BullyElection {
         listeners.add(listener);
     }
 
+    /** Líder conhecido, ou -1 enquanto nenhum foi eleito. */
     public int leaderId() {
-        return leaderId;
+        return leaderId.get();
     }
 
     public boolean isLeader() {
-        return leaderId == selfId;
+        return leaderId.get() == selfId;
     }
 
     /** Inicia uma eleição em background (ignorado se já houver uma em andamento). */
@@ -121,9 +123,14 @@ public final class BullyElection {
         setLeader(id);
     }
 
+    @Override
+    public void close() {
+        executor.shutdownNow();
+    }
+
     private void setLeader(int id) {
-        int old = leaderId;
-        leaderId = id;
+        // getAndSet: com COORDINATORs concorrentes, cada troca notifica os listeners uma única vez
+        int old = leaderId.getAndSet(id);
         if (old != id) {
             Log.info("Novo líder: N%d", id);
             listeners.forEach(l -> l.accept(id));

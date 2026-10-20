@@ -40,7 +40,7 @@ class BullyElectionTest {
         BullyElection e = new BullyElection(2, t);
         e.startElection();
         await(e::isLeader);
-        assertTrue(t.coordinatorBroadcast.get());
+        await(t.coordinatorBroadcast::get); // anunciado logo depois de assumir
         assertFalse(t.electionsSent.contains(1), "não envia ELECTION para id menor");
     }
 

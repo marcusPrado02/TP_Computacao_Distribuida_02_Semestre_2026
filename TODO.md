@@ -16,7 +16,7 @@ Cada pessoa é dona de um módulo e precisa conseguir explicá-lo na arguição.
 
 ## Semana 1 — entender e fechar o núcleo
 - [ ] Todos: ler `docs/ARQUITETURA.md`, rodar `mvn test` e `docker compose up`
-- [ ] D: implementar `RicartAgrawala.shouldDefer` até `RicartAgrawalaTest` passar
+- [x] D: implementar `RicartAgrawala.shouldDefer` até `RicartAgrawalaTest` passar
 - [ ] A: validar build + compose em pelo menos 2 máquinas do grupo
 - [ ] B: baixar `berlin52.tsp` (TSPLIB) para `data/` e testar com `TSP_FILE`
 - [ ] C: revisar `BullyElection` e explicar o fluxo ao grupo
@@ -24,7 +24,7 @@ Cada pessoa é dona de um módulo e precisa conseguir explicá-lo na arguição.
 ## Semana 2 — robustez e demo
 - [ ] B: ajustar instância/parâmetros para cada rodada durar ~1 s (hoje, com 60 cidades, ~70 ms é rápido demais para demonstrar falha)
 - [ ] C: roteiro de demo do failover (`docker compose stop node4` → N3 assume)
-- [ ] D: teste mostrando que sem mutex as réplicas divergem (argumento para o relatório)
+- [x] D: teste mostrando que sem mutex as réplicas divergem (argumento para o relatório) → `PheromoneMatrixTest`
 - [ ] A: rodar 4 nós em 4 máquinas na LAN e registrar prints/logs
 
 ## Semana 3 — relatório (template SBC, até 4 páginas)

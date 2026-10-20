@@ -57,7 +57,7 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 | `Coordinator` | líder → todos | `leader_id` | Bully |
 | `Heartbeat` | seguidor → líder | — | Monitor |
 | `RequestCS` | nó → todos | `request_ts` (Lamport do pedido) | Ricart-Agrawala |
-| `ReplyCS` | nó → solicitante | — (permissão) | Ricart-Agrawala |
+| `ReplyCS` | nó → solicitante | `request_ts` do pedido autorizado | Ricart-Agrawala |
 | `StartRound` | líder → todos | `round` | Coordenação |
 | `RoundDone` | nó → líder | `round`, `tour`, `length` | Coordenação |
 | `UpdatePheromone` | dono da SC → todos | matriz n×n, melhor rota | ACO |
@@ -84,20 +84,39 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 - **Recurso protegido:** a matriz de feromônio global. Atualizar + propagar é a seção crítica.
 - Prioridade por `(request_ts, id)`. Estados `RELEASED / WANTED / HELD`.
 - `ReplyCS` é um RPC separado (assíncrono), então o handler de `RequestCS` nunca bloqueia.
+- `ReplyCS` carrega o `request_ts` que autoriza. REPLY de pedido antigo é descartado. Sem isso, um REPLY
+  atrasado (o pedido deu timeout, foi contado como permissão e depois o peer respondeu de verdade)
+  liberaria o pedido **seguinte** antes da hora.
+- Enquanto espera, o nó reavalia a cada 500 ms quem está vivo: peer que caiu deixa de ser aguardado.
+  Sem isso, se o líder morre segurando REPLYs adiados, todos os outros travam no `acquire()`.
 - O broadcast da matriz é **síncrono dentro da SC**: quem entra depois sempre vê a matriz mais recente.
 
 **Por que precisa de exclusão mútua?** Cada nó faz *ler matriz → evaporar → depositar → propagar*. Sem a SC, duas atualizações concorrentes se sobrescrevem (*lost update*) e as réplicas divergem.
 
 ## 6. Limitações conhecidas (insumo para a Entrega 2)
 
-- Peer inacessível no momento do `RequestCS` conta como permissão. Se ele voltar no meio, pode haver violação de exclusão.
-- Se o nó morrer **dentro** da SC, os pedidos adiados para ele ficam sem resposta e os outros travam.
+- Peer inacessível no momento do `RequestCS`, ou marcado como inacessível durante a espera, conta como permissão.
+  Se ele só estava lento (não morto), pode haver violação de exclusão. Detector de falhas é por timeout
+  (assíncrono), então não distingue lento de morto.
+- Só o líder recebe heartbeat. Um seguidor que cai só é notado quando alguém tenta falar com ele
+  (no próximo `StartRound`, por exemplo). Até lá, quem espera REPLY dele fica parado (no pior caso,
+  até o timeout de 30 s da rodada).
 - Rodada perdida na troca de líder é pulada (o novo líder segue de `lastRound + 1`).
 - Réplicas da matriz não têm versão: um nó que volta depois de cair recomeça com a matriz inicial.
 - Segurança: sem TLS, o token trafega em claro na LAN. Um membro com o token ainda consegue forjar o `sender_id` de outro membro. A solução completa é mTLS com um certificado por nó.
 - Os itens de falha/réplica acima são tratamento de falhas / controle de réplicas: escopo da Entrega 2.
 
-## 7. Parâmetros (variáveis de ambiente)
+## 7. Testes
+
+| Teste | O que garante |
+|---|---|
+| `RicartAgrawalaTest` | regra de adiamento (RELEASED/WANTED/HELD, empate por id), REPLY antigo ignorado, peer que cai |
+| `RicartAgrawalaSafetyTest` | 4 nós disputando 30× cada, rede com atraso aleatório: nunca 2 na SC, sem deadlock |
+| `PheromoneMatrixTest` | *lost update* sem exclusão mútua (réplicas divergem) vs. convergência com SC |
+| `BullyElectionTest` | maior vivo vence, contestação de id menor |
+| `ClusterIntegrationTest` | 3 nós com gRPC real: elege N3, roda as rodadas, réplicas idênticas, failover N3 → N2, token/remetente recusados |
+
+## 8. Parâmetros (variáveis de ambiente)
 
 | Variável | Padrão | Significado |
 |---|---|---|
