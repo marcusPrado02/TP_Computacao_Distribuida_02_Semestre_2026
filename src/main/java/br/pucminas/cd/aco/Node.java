@@ -52,6 +52,10 @@ public final class Node implements AutoCloseable {
                 ? TspInstance.fromTsplib(Path.of(cfg.tspFile()))
                 : TspInstance.random(cfg.tspCities(), cfg.tspSeed());
         double nearestNeighbor = tsp.nearestNeighborLength();
+        if (!(nearestNeighbor > 0) || !Double.isFinite(nearestNeighbor)) {
+            throw new IllegalArgumentException(
+                    "instância TSP degenerada: todas as cidades coincidem (vizinho mais próximo = 0)");
+        }
         Log.info("TSP com %d cidades; vizinho mais próximo = %.0f", tsp.size(), nearestNeighbor);
 
         // τ0 = 1 / (ρ · L_nn), inicialização usual do MAX-MIN Ant System
@@ -64,7 +68,7 @@ public final class Node implements AutoCloseable {
         this.mutex = new RicartAgrawala(cfg.nodeId(), clock, network);
 
         this.coordinator = new RoundCoordinator(cfg, network, best, election::isLeader);
-        this.worker = new RoundWorker(cfg, colony, pheromone, best, mutex, network, election::leaderId, coordinator);
+        this.worker = new RoundWorker(cfg, colony, pheromone, best, mutex, network, coordinator);
         coordinator.attach(worker);
         election.onLeaderChange(leader -> {
             if (leader == cfg.nodeId()) coordinator.onBecameLeader();
@@ -72,6 +76,7 @@ public final class Node implements AutoCloseable {
 
         NodeServiceImpl service = new NodeServiceImpl(clock, network, election, mutex, worker, coordinator);
         this.server = ServerBuilder.forPort(cfg.port())
+                .maxInboundMessageSize(PeerNetwork.MAX_MESSAGE_BYTES)
                 .addService(ServerInterceptors.intercept(service,
                         // Repassa Status lançados nos handlers (ex.: PERMISSION_DENIED) em vez de UNKNOWN
                         TransmitStatusRuntimeExceptionInterceptor.instance(),
@@ -124,14 +129,15 @@ public final class Node implements AutoCloseable {
 
     @Override
     public void close() throws InterruptedException {
-        // Para de gerar trabalho antes de derrubar a rede que ele usa.
+        // Para de aceitar trabalho antes de derrubar os módulos que ele usa; só então
+        // espera os handlers em voo terminarem.
+        server.shutdownNow();
+        server.awaitTermination(5, TimeUnit.SECONDS);
         monitor.close();
         coordinator.close();
         worker.close();
         election.close();
         mutex.close();
-        server.shutdownNow();
         network.close();
-        server.awaitTermination(5, TimeUnit.SECONDS);
     }
 }

@@ -17,6 +17,7 @@ import br.pucminas.cd.aco.grpc.RoundStart;
 import br.pucminas.cd.aco.mutex.RicartAgrawala;
 import br.pucminas.cd.aco.round.RoundSink;
 import br.pucminas.cd.aco.round.RoundWorker;
+import br.pucminas.cd.aco.util.Log;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
@@ -52,7 +53,13 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
 
     @Override
     public void coordinator(CoordinatorMsg req, StreamObserver<Ack> obs) {
-        receive(req.getHeader());
+        int from = receive(req.getHeader());
+        if (req.getLeaderId() != from) {
+            // Um COORDINATOR só pode anunciar o próprio remetente; evita líder "fantasma".
+            Log.info("COORDINATOR ignorado: N%d anunciou N%d", from, req.getLeaderId());
+            ack(obs);
+            return;
+        }
         election.onCoordinator(req.getLeaderId());
         ack(obs);
     }
@@ -79,8 +86,8 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
 
     @Override
     public void startRound(RoundStart req, StreamObserver<Ack> obs) {
-        receive(req.getHeader());
-        worker.onStartRound(req.getRound());
+        int from = receive(req.getHeader());
+        worker.onStartRound(req.getRound(), from);
         ack(obs);
     }
 

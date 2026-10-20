@@ -67,14 +67,21 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 ### 5.1 RPC — gRPC
 - Um único serviço `NodeService`; cliente em `rpc/PeerNetwork`, servidor em `rpc/NodeServiceImpl`.
 - **Autenticação:** token compartilhado (`CLUSTER_TOKEN`) no header `x-cluster-token`, verificado por um `ServerInterceptor` (`rpc/ClusterAuth`). Sem ele, `UNAUTHENTICATED`. O `sender_id` também precisa estar em `PEERS`; caso contrário, `PERMISSION_DENIED`.
-- Toda chamada tem *deadline* (500 ms; 2 s para o broadcast da matriz). Falha → peer marcado como inacessível.
+- *Deadlines*: 500 ms para os RPCs rápidos, 1 s para heartbeat e 2 s para o broadcast da matriz.
+  Falha → peer marcado como inacessível e re-probado depois de 2 s.
+- Mensagens limitadas a **64 MiB** no cliente e no servidor. O padrão do gRPC (4 MiB) estouraria a
+  matriz a partir de ~725 cidades; 64 MiB cobrem ~2900 cidades. Acima disso não há chunking.
 
 ### 5.2 Eleição de líder — Bully (`election/`)
 - Nó envia `Election` a todos de id maior. Ninguém responde OK → vira líder e envia `Coordinator`.
 - Alguém responde OK → espera `Coordinator` por 3 s; se não chegar, recomeça.
 - `Coordinator` vindo de id **menor** é contestado (nova eleição).
-- Disparo: na inicialização e quando o `LeaderMonitor` perde 3 heartbeats seguidos.
-- Novo líder continua da última rodada vista (`RoundWorker.lastRound()`).
+- Disparo: na inicialização e quando o `LeaderMonitor` perde 5 heartbeats seguidos (timeout de 1 s;
+  ~5 s no pior caso).
+- O líder reanuncia `Coordinator` a cada 1 s. Isso corrige a visão de um nó que voltou ou ficou
+  isolado por pouco tempo; em caso de dois líderes, o maior id vence.
+- Novo líder continua da última rodada vista (`RoundWorker.lastRound()`), mas se ele estava fora
+  do cluster a rodada pode retroceder (ver §6).
 
 ### 5.3 Relógio lógico — Lamport (`clock/`)
 - Envio: `tick()`; recebimento (requisição ou resposta): `max(local, remoto) + 1`.
@@ -87,34 +94,69 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 - `ReplyCS` carrega o `request_ts` que autoriza. REPLY de pedido antigo é descartado. Sem isso, um REPLY
   atrasado (o pedido deu timeout, foi contado como permissão e depois o peer respondeu de verdade)
   liberaria o pedido **seguinte** antes da hora.
-- Enquanto espera, o nó reavalia a cada 500 ms quem está vivo: peer que caiu deixa de ser aguardado.
-  Sem isso, se o líder morre segurando REPLYs adiados, todos os outros travam no `acquire()`.
-- O broadcast da matriz é **síncrono dentro da SC**: quem entra depois sempre vê a matriz mais recente.
+- O pedido vai a **todos os peers configurados**; quem não respondeu recebe o REQUEST de novo a cada
+  500 ms. Isso recupera um REPLY perdido e detecta o peer que caiu depois de receber o pedido (o
+  reenvio falha e ele deixa de ser aguardado).
+- Peer que falhou entra em **quarentena de 2 s**: `sendRequest` devolve `false` sem gastar um
+  timeout por rodada, e ele é re-probado depois. Sem isso, um peer recuperado nunca voltava a ser
+  contatado e ficava excluído para sempre.
+- O `RoundDone` volta para **quem enviou o `StartRound`**, não para o líder eleito. Um líder que
+  reiniciou e ainda não foi aceito por todos continua recebendo os resultados das suas rodadas.
+- O líder usa heartbeat como *probe* dos participantes pendentes a cada 500 ms. Sem isso, um
+  seguidor que morre depois do `StartRound` custava os 30 s do timeout da rodada.
+- O broadcast da matriz é **síncrono dentro da SC**: quem entra depois vê a matriz mais recente.
+  O coordenador é sempre contatado, mesmo em quarentena, porque é ele que precisa da matriz.
+
+**Atenção:** uma falha de REQUEST conta como permissão. Se o peer estava apenas lento, isso viola a
+exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não tolerante a partições.
 
 **Por que precisa de exclusão mútua?** Cada nó faz *ler matriz → evaporar → depositar → propagar*. Sem a SC, duas atualizações concorrentes se sobrescrevem (*lost update*) e as réplicas divergem.
 
 ## 6. Limitações conhecidas (insumo para a Entrega 2)
 
-- Peer inacessível no momento do `RequestCS`, ou marcado como inacessível durante a espera, conta como permissão.
-  Se ele só estava lento (não morto), pode haver violação de exclusão. Detector de falhas é por timeout
-  (assíncrono), então não distingue lento de morto.
-- Só o líder recebe heartbeat. Um seguidor que cai só é notado quando alguém tenta falar com ele
-  (no próximo `StartRound`, por exemplo). Até lá, quem espera REPLY dele fica parado (no pior caso,
-  até o timeout de 30 s da rodada).
-- Rodada perdida na troca de líder é pulada (o novo líder segue de `lastRound + 1`).
-- Réplicas da matriz não têm versão: um nó que volta depois de cair recomeça com a matriz inicial.
-- Segurança: sem TLS, o token trafega em claro na LAN. Um membro com o token ainda consegue forjar o `sender_id` de outro membro. A solução completa é mTLS com um certificado por nó.
-- Os itens de falha/réplica acima são tratamento de falhas / controle de réplicas: escopo da Entrega 2.
+- **Detector de falhas é por timeout e a falha conta como permissão.** Se o peer apenas estava lento
+  (GC, pico de carga), ele pode entrar na SC ao mesmo tempo que quem o considerou morto. Reproduzido:
+  um REQUEST que devolve `false` com o peer vivo coloca os dois na seção crítica. Não existe detector
+  perfeito em sistema assíncrono; corrigir exige membership/quórum/consenso.
+- **Peer alcançável que nunca responde** (handler travado, falha assimétrica da rede) mantém o
+  `acquire()` esperando indefinidamente: não há timeout global do pedido. Um timeout global trocaria
+  o travamento por mais uma chance de violar a exclusão.
+- **Réplicas sem versão.** A matriz é substituída inteira; um nó que voltou com a matriz inicial pode
+  sobrescrever o progresso de todos. Um UPDATE atrasado (deadline estourado, mas handler executado
+  depois) também pode aplicar uma matriz antiga por cima de uma nova. Precisa de epoch/versão e
+  reconciliação.
+- **Estado de rodada só em memória.** Um líder que reinicia volta a `lastRound = 0`, recomeça em
+  `1/ROUNDS` e retransmite a matriz inicial. O `RoundWorker` ignora rodadas repetidas (não refaz a
+  SC e responde), mas o líder ainda re-executa as rodadas. Falta transferir estado/catch-up antes
+  de assumir.
+- **Token/PEERS divergentes = split-brain silencioso.** Cada nó se elege líder e roda o ACO sozinho;
+  os logs mostram `UNAUTHENTICATED`/`PERMISSION_DENIED`, mas o processo continua. Falta um handshake
+  de startup que falhe rápido.
+- **Heartbeat pode gerar falso positivo sob carga.** Timeout de 1 s e 5 faltas (~5 s); com milhares
+  de rodadas por segundo e instância grande, o heartbeat pode atrasar e provocar eleição
+  desnecessária. Não ocorreu no cenário padrão (30 rodadas).
+- **TSPLIB limitado** a `NODE_COORD_SECTION`; `DIMENSION` não é conferido. O parser agora rejeita
+  arquivo sem a seção, linha malformada e menos de 3 cidades, e para em outra `_SECTION`.
+- **Tamanho da matriz.** Limite de 64 MiB por mensagem => ~2900 cidades (`n²` doubles). Acima disso
+  o broadcast falha; não há chunking.
+- **Sem TLS.** O token trafega em claro na LAN; um membro com o token pode forjar o `sender_id` de
+  outro. A solução completa é mTLS com certificado por nó.
+- **Sem persistência** de matriz, melhor rota ou rodada.
+- Os itens de réplica/consenso acima continuam sendo o escopo natural da Entrega 2.
 
 ## 7. Testes
 
 | Teste | O que garante |
 |---|---|
-| `RicartAgrawalaTest` | regra de adiamento (RELEASED/WANTED/HELD, empate por id), REPLY antigo ignorado, peer que cai |
+| `RicartAgrawalaTest` | adiamento (RELEASED/WANTED/HELD, empate por id), REPLY antigo, peer que cai, REPLY perdido recuperado por reenvio, peer recuperado recontatado |
 | `RicartAgrawalaSafetyTest` | 4 nós disputando 30× cada, rede com atraso aleatório: nunca 2 na SC, sem deadlock |
 | `PheromoneMatrixTest` | *lost update* sem exclusão mútua (réplicas divergem) vs. convergência com SC |
 | `BullyElectionTest` | maior vivo vence, contestação de id menor |
-| `ClusterIntegrationTest` | 3 nós com gRPC real: elege N3, roda as rodadas, réplicas idênticas, failover N3 → N2, token/remetente recusados |
+| `RoundWorkerTest` | rodada repetida não reaplica feromônio e responde ao coordenador |
+| `TspInstanceTest` | TSPLIB válido, outra seção (`DISPLAY_DATA_SECTION`), arquivo vazio, < 3 cidades, linha malformada, vizinho mais próximo |
+| `ClusterIntegrationTest` | 3 nós com gRPC real: elege N3, rodadas, réplicas idênticas, failover do líder, queda de seguidor sem travar, token/remetente recusados |
+
+Total: 37 testes (`mvn test` no container, ~10 s).
 
 ## 8. Parâmetros (variáveis de ambiente)
 

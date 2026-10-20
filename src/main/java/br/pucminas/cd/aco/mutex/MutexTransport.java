@@ -4,6 +4,9 @@ import java.util.Set;
 
 /** O que o Ricart-Agrawala precisa da rede. Implementado por PeerNetwork (gRPC) e por fakes nos testes. */
 public interface MutexTransport {
+    /** Todos os peers configurados (vivos ou não). Um peer que falhou é re-probado depois. */
+    Set<Integer> allPeers();
+
     /** Peers considerados vivos; consultado no pedido e periodicamente durante a espera. */
     Set<Integer> alivePeers();
 

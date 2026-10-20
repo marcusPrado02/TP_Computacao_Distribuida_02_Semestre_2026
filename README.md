@@ -14,12 +14,22 @@ Colônia de Formigas (ACO) resolvendo o Caixeiro-Viajante em vários nós Java q
 - Java 21 e Maven 3.9+ (para rodar sem Docker)
 - Docker + Docker Compose v2 (para rodar em contêineres)
 
-## Build e testes
+## Build e testes (Docker)
+
+Tudo roda em containers; não é preciso ter Java/Maven instalado no host.
 
 ```bash
-mvn test              # testes unitários + integração (3 nós gRPC na mesma JVM, ~10 s)
-mvn clean package     # gera target/aco-node.jar
+docker build --target build -t aco-build .
+docker run --rm aco-build mvn -B test   # 37 testes (unitários + integração), ~10 s
+docker compose up --build               # cluster de 4 nós
 ```
+
+O JAR `target/aco-node.jar` é gerado dentro do estágio `build` e copiado para a imagem final.
+Se preferir sem Docker, `mvn test` e `mvn clean package` continuam funcionando (Java 21 + Maven 3.9+);
+nesse caso, rode `mvn clean package` antes de executar o JAR para não empacotar classes velhas.
+
+> Reiniciar um nó que era líder faz ele recomeçar da rodada 1 com a matriz inicial; veja
+> "Limitações conhecidas" em `docs/ARQUITETURA.md` antes de fazer isso na demo.
 
 ## Token do cluster
 
@@ -30,9 +40,6 @@ Gere um token por grupo e **não o versione**:
 cp .env.example .env
 sed -i "s/troque-este-token/$(openssl rand -hex 16)/" .env
 ```
-
-> Se o VS Code (extensão Java) estiver aberto, ele também compila em `target/`.
-> Use `mvn clean package` antes de rodar o JAR para não empacotar classes desatualizadas.
 
 ## Rodar com Docker Compose (4 nós)
 

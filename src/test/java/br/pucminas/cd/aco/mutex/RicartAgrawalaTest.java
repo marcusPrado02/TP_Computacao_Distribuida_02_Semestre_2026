@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +24,7 @@ class RicartAgrawalaTest {
             this.peers.addAll(peers);
         }
 
+        @Override public Set<Integer> allPeers() { return Set.copyOf(peers); }
         @Override public Set<Integer> alivePeers() { return Set.copyOf(peers); }
         @Override public boolean sendRequest(int to, long timestamp) { return true; }
         @Override public void sendReply(int to, long requestTs) { repliesSent.add(to); }
@@ -113,5 +115,88 @@ class RicartAgrawalaTest {
     void releaseForaDaSecaoCriticaEhErro() {
         RicartAgrawala ra = new RicartAgrawala(2, new LamportClock(), new FakeTransport(Set.of()));
         assertThrows(IllegalStateException.class, ra::release);
+    }
+
+    @Test
+    void pedidoReenviadoRecuperaReplyPerdido() throws InterruptedException {
+        AtomicInteger calls = new AtomicInteger();
+        RicartAgrawala[] ra = new RicartAgrawala[1];
+        MutexTransport t = new MutexTransport() {
+            @Override public Set<Integer> allPeers() { return Set.of(3); }
+            @Override public Set<Integer> alivePeers() { return Set.of(3); }
+            @Override public boolean sendRequest(int to, long ts) {
+                // O primeiro REQUEST foi entregue, mas o REPLY se perdeu; no reenvio, responde.
+                if (calls.incrementAndGet() >= 2) ra[0].onReply(3, ts);
+                return true;
+            }
+            @Override public void sendReply(int to, long ts) {}
+        };
+        ra[0] = new RicartAgrawala(1, new LamportClock(), t);
+        Thread th = Thread.ofVirtual().start(() -> {
+            try { ra[0].acquire(); } catch (InterruptedException ignored) {}
+        });
+        await(() -> ra[0].state() == RicartAgrawala.State.HELD);
+        assertTrue(calls.get() >= 2, "deveria ter reenviado o REQUEST");
+        ra[0].release();
+        th.join(1000);
+        ra[0].close();
+    }
+
+    @Test
+    void peerQueCaiDepoisDeReceberRequestNaoTrava() throws InterruptedException {
+        Set<Integer> alive = ConcurrentHashMap.newKeySet();
+        alive.add(3);
+        AtomicInteger calls = new AtomicInteger();
+        MutexTransport t = new MutexTransport() {
+            @Override public Set<Integer> allPeers() { return Set.of(3); }
+            @Override public Set<Integer> alivePeers() { return Set.copyOf(alive); }
+            @Override public boolean sendRequest(int to, long ts) {
+                if (calls.incrementAndGet() == 1) return true; // recebeu o REQUEST...
+                alive.remove(3);                              // ...e morreu antes do REPLY
+                return false;
+            }
+            @Override public void sendReply(int to, long ts) {}
+        };
+        RicartAgrawala ra = new RicartAgrawala(1, new LamportClock(), t);
+        Thread th = Thread.ofVirtual().start(() -> {
+            try { ra.acquire(); } catch (InterruptedException ignored) {}
+        });
+        await(() -> ra.state() == RicartAgrawala.State.HELD);
+        ra.release();
+        th.join(1000);
+        ra.close();
+    }
+
+    @Test
+    void peerQueVoltaEhRecontatadoNaProximaEntrada() throws InterruptedException {
+        Set<Integer> alive = ConcurrentHashMap.newKeySet();
+        alive.add(3);
+        AtomicInteger calls = new AtomicInteger();
+        boolean[] reachable = {false};
+        RicartAgrawala[] ra = new RicartAgrawala[1];
+        MutexTransport t = new MutexTransport() {
+            @Override public Set<Integer> allPeers() { return Set.of(3); }
+            @Override public Set<Integer> alivePeers() { return Set.copyOf(alive); }
+            @Override public boolean sendRequest(int to, long ts) {
+                calls.incrementAndGet();
+                if (!reachable[0]) {
+                    alive.remove(3);
+                    return false;
+                }
+                ra[0].onReply(3, ts);
+                return true;
+            }
+            @Override public void sendReply(int to, long ts) {}
+        };
+        ra[0] = new RicartAgrawala(1, new LamportClock(), t);
+
+        ra[0].acquire(); // peer falha e fica em quarentena
+        ra[0].release();
+        reachable[0] = true;
+        ra[0].acquire(); // deve recontatar o peer que voltou
+        ra[0].release();
+
+        assertEquals(2, calls.get(), "peer recuperado precisa ser recontatado");
+        ra[0].close();
     }
 }

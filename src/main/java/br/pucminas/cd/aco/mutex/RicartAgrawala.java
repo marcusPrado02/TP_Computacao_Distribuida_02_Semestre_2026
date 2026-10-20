@@ -18,9 +18,11 @@ import java.util.concurrent.Executors;
  *
  * <p>Cada REPLY carrega o timestamp do pedido que autoriza; REPLYs de pedidos antigos são descartados.
  *
- * <p>Tolerância mínima a falhas (só para não travar): peer inacessível ao receber o REQUEST conta como
- * permissão, e peer que deixa de constar como vivo durante a espera deixa de ser aguardado.
- * Isso pode violar a exclusão se o peer só estava lento; ver "Limitações" em docs/ARQUITETURA.md.
+ * <p>Tolerância mínima a falhas (só para não travar): peer inacessível conta como permissão, e peer que
+ * deixa de constar como vivo deixa de ser aguardado. Pedidos pendentes são reenviados a cada
+ * {@link #LIVENESS_POLL_MS}, o que recupera REPLYs perdidos e detecta peer que caiu depois de receber
+ * o REQUEST. Isso ainda pode violar a exclusão se o peer só estava lento; ver "Limitações" em
+ * docs/ARQUITETURA.md.
  */
 public final class RicartAgrawala implements AutoCloseable {
     enum State { RELEASED, WANTED, HELD }
@@ -57,7 +59,9 @@ public final class RicartAgrawala implements AutoCloseable {
             state = State.WANTED;
             ts = clock.tick();
             requestTs = ts;
-            targets = new HashSet<>(transport.alivePeers());
+            // Todos os peers, não só os "vivos": um peer que foi marcado inacessível numa rodada
+            // anterior precisa ser recontatado quando voltar (senão fica excluído para sempre).
+            targets = new HashSet<>(transport.allPeers());
             awaiting.clear();
             awaiting.addAll(targets);
         }
@@ -73,6 +77,13 @@ public final class RicartAgrawala implements AutoCloseable {
                     wait(LIVENESS_POLL_MS);
                     // Peer que caiu durante a espera nunca vai responder.
                     awaiting.retainAll(transport.alivePeers());
+                    // Reenvia o pedido a quem ainda não respondeu: recupera um REPLY perdido e,
+                    // se o peer morreu depois de receber o REQUEST, a falha do reenvio o remove.
+                    for (int peer : Set.copyOf(awaiting)) {
+                        executor.submit(() -> {
+                            if (!transport.sendRequest(peer, ts)) onReply(peer, ts);
+                        });
+                    }
                 }
             } catch (InterruptedException e) {
                 // Desiste do pedido sem ficar em WANTED (que adiaria REPLYs para sempre).

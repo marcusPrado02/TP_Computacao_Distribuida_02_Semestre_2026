@@ -37,6 +37,7 @@ class RicartAgrawalaSafetyTest {
         MutexTransport transportFor(int self) {
             Set<Integer> others = Set.copyOf(IntStream.rangeClosed(1, NODES).filter(i -> i != self).boxed().toList());
             return new MutexTransport() {
+                @Override public Set<Integer> allPeers() { return others; }
                 @Override public Set<Integer> alivePeers() { return others; }
 
                 @Override public boolean sendRequest(int to, long timestamp) {

@@ -63,7 +63,7 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
                 Log.info("LÍDER: iniciando rodada %d/%d com nós %s", round, cfg.rounds(), participants);
 
                 network.broadcastStartRound(round);
-                worker.onStartRound(round);
+                worker.onStartRound(round, cfg.nodeId());
                 awaitRound(round, participants);
 
                 Tour global = best.get();
@@ -100,13 +100,20 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
     /** Espera RoundDone de todos os participantes que continuam vivos (ou timeout). */
     private void awaitRound(int round, Set<Integer> participants) throws InterruptedException {
         long deadline = System.currentTimeMillis() + ROUND_TIMEOUT_MS;
-        synchronized (this) {
-            while (isLeader.getAsBoolean() && System.currentTimeMillis() < deadline) {
-                Set<Integer> pending = new HashSet<>(participants);
-                pending.removeAll(done.get(round));
+        while (true) {
+            Set<Integer> pending;
+            synchronized (this) {
+                pending = new HashSet<>(participants);
+                pending.removeAll(done.getOrDefault(round, Set.of()));
                 pending.retainAll(aliveWithSelf());
-                if (pending.isEmpty()) return;
+                if (pending.isEmpty() || !isLeader.getAsBoolean()) return;
+                if (System.currentTimeMillis() >= deadline) break;
                 wait(POLL_MS);
+            }
+            // Fora do lock: heartbeat serve de probe. O líder não recebe heartbeat de ninguém;
+            // sem isso, um seguidor que morre depois do StartRound só é notado 30 s depois.
+            for (int id : pending) {
+                if (id != cfg.nodeId()) network.heartbeat(id);
             }
         }
         Log.info("LÍDER: rodada %d encerrada por timeout", round);
