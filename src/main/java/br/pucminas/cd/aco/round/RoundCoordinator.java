@@ -19,7 +19,7 @@ import java.util.function.BooleanSupplier;
  * Papel de líder: dispara rodadas (StartRound), espera os RoundDone dos nós vivos
  * e acompanha a melhor rota global. Só roda enquanto este nó for o líder eleito.
  */
-public final class RoundCoordinator implements RoundSink {
+public final class RoundCoordinator implements RoundSink, AutoCloseable {
     private static final long ROUND_TIMEOUT_MS = 30_000;
     private static final long POLL_MS = 500;
 
@@ -29,6 +29,7 @@ public final class RoundCoordinator implements RoundSink {
     private final BooleanSupplier isLeader;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicBoolean finished = new AtomicBoolean(false);
     private final Map<Integer, Set<Integer>> done = new ConcurrentHashMap<>();
     private RoundWorker worker;
 
@@ -71,14 +72,29 @@ public final class RoundCoordinator implements RoundSink {
                 round++;
             }
             if (round > cfg.rounds()) {
+                finished.set(true);
                 Tour global = best.get();
-                Log.info("FIM: melhor rota = %.0f %s", global.length(), Arrays.toString(global.cities()));
+                if (global == null) {
+                    Log.info("FIM: nenhuma rota recebida");
+                } else {
+                    Log.info("FIM: melhor rota = %.0f %s", global.length(), Arrays.toString(global.cities()));
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
             running.set(false);
         }
+    }
+
+    /** true depois que este nó, como líder, concluiu a última rodada. */
+    public boolean isFinished() {
+        return finished.get();
+    }
+
+    @Override
+    public void close() {
+        executor.shutdownNow();
     }
 
     /** Espera RoundDone de todos os participantes que continuam vivos (ou timeout). */

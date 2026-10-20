@@ -17,7 +17,7 @@ import java.util.function.IntSupplier;
  * Papel de trabalhador (todo nó, inclusive o líder). A cada rodada:
  * formigas locais -> seção crítica (atualiza + propaga feromônio) -> avisa o líder.
  */
-public final class RoundWorker {
+public final class RoundWorker implements AutoCloseable {
     private final NodeConfig cfg;
     private final AntColony colony;
     private final PheromoneMatrix pheromone;
@@ -56,6 +56,11 @@ public final class RoundWorker {
         lastRound.accumulateAndGet(round, Math::max);
         pheromone.replace(tau);
         best.offer(senderBest);
+    }
+
+    @Override
+    public void close() {
+        executor.shutdownNow();
     }
 
     private void runRound(int round) {

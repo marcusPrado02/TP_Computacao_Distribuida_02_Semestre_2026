@@ -73,7 +73,7 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     @Override
     public void replyCS(CsReply req, StreamObserver<Ack> obs) {
         int from = receive(req.getHeader());
-        mutex.onReply(from);
+        mutex.onReply(from, req.getRequestTs());
         ack(obs);
     }
 

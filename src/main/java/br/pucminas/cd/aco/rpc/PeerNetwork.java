@@ -109,9 +109,9 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     }
 
     @Override
-    public void sendReply(int to) {
+    public void sendReply(int to, long requestTs) {
         executor.submit(() -> ack(to, FAST_TIMEOUT_MS,
-                s -> s.replyCS(CsReply.newBuilder().setHeader(header()).build())));
+                s -> s.replyCS(CsReply.newBuilder().setHeader(header()).setRequestTs(requestTs).build())));
     }
 
     // ---------------------------------------------------------------- Rodadas ACO

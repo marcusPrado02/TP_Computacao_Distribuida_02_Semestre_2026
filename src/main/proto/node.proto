@@ -60,8 +60,11 @@ message CsRequest {
   int64 request_ts = 2;
 }
 
+// request_ts identifica qual pedido está sendo autorizado. Sem ele, um REPLY
+// atrasado de um pedido antigo poderia ser contado como permissão do pedido atual.
 message CsReply {
   Header header = 1;
+  int64 request_ts = 2;
 }
 
 message RoundStart {

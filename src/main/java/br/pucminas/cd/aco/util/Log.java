@@ -4,7 +4,10 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.function.LongSupplier;
 
-/** Log no formato "hora [N<id>][L=<lamport>] mensagem", útil para a demonstração. */
+/**
+ * Log no formato "hora [N<id>][L=<lamport>] mensagem", útil para a demonstração.
+ * Estado global ao processo: assume um nó por JVM (como em produção).
+ */
 public final class Log {
     private static volatile int nodeId = -1;
     private static volatile LongSupplier lamport = () -> 0;
