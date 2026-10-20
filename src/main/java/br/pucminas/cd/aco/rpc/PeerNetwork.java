@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -34,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -41,6 +44,9 @@ import java.util.function.Function;
  * e visão de quais peers estão vivos (atualizada a cada chamada).
  */
 public final class PeerNetwork implements MutexTransport, ElectionTransport, AutoCloseable {
+    /** Resultado do handshake de configuração (heartbeat usado como probe no startup). */
+    public enum HandshakeResult { OK, UNREACHABLE, AUTH, PEERS, OTHER }
+
     private static final long FAST_TIMEOUT_MS = 500;
     private static final long HEARTBEAT_TIMEOUT_MS = 1_000;
     private static final long BROADCAST_TIMEOUT_MS = 2_000;
@@ -57,6 +63,8 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     private final Set<Integer> alive = ConcurrentHashMap.newKeySet();
     /** Instante a partir do qual vale a pena tentar de novo um peer marcado como inacessível. */
     private final Map<Integer, Long> retryAfter = new ConcurrentHashMap<>();
+    /** Config divergente é erro fatal; o Node instala o handler e encerra o processo. */
+    private volatile Consumer<String> configErrorHandler = message -> {};
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     public PeerNetwork(int selfId, LamportClock clock, Map<Integer, String> peers, String clusterToken) {
@@ -83,6 +91,47 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     @Override
     public Set<Integer> allPeers() {
         return stubs.keySet();
+    }
+
+    /** Conjunto de membros deste nó (self + PEERS), ordenado; usado no handshake. */
+    public SortedSet<Integer> members() {
+        SortedSet<Integer> all = new TreeSet<>();
+        all.add(selfId);
+        all.addAll(stubs.keySet());
+        return all;
+    }
+
+    /** Instala a ação de erro fatal de configuração (usada pelo NodeMain via Node). */
+    public void setConfigErrorHandler(Consumer<String> handler) {
+        this.configErrorHandler = handler;
+    }
+
+    /**
+     * Handshake de startup: usa o heartbeat como probe e classifica a falha.
+     * Não lança: o chamador decide se {@link HandshakeResult#AUTH}/{@link HandshakeResult#PEERS} é fatal.
+     */
+    public HandshakeResult probe(int peer) {
+        try {
+            Ack response = stubs.get(peer)
+                    .withDeadlineAfter(HEARTBEAT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                    .heartbeat(HeartbeatMsg.newBuilder()
+                            .setHeader(header())
+                            .addAllMembers(members())
+                            .build());
+            clock.onReceive(response.getHeader().getLamport());
+            retryAfter.remove(peer);
+            alive.add(peer);
+            return HandshakeResult.OK;
+        } catch (StatusRuntimeException e) {
+            alive.remove(peer);
+            retryAfter.put(peer, System.currentTimeMillis() + RETRY_AFTER_MS);
+            return switch (e.getStatus().getCode()) {
+                case UNAUTHENTICATED -> HandshakeResult.AUTH;
+                case PERMISSION_DENIED, FAILED_PRECONDITION -> HandshakeResult.PEERS;
+                case UNAVAILABLE, DEADLINE_EXCEEDED -> HandshakeResult.UNREACHABLE;
+                default -> HandshakeResult.OTHER;
+            };
+        }
     }
 
     @Override
@@ -203,8 +252,10 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
                 Status.Code code = e.getStatus().getCode();
                 if (code == Status.Code.UNAUTHENTICATED) {
                     Log.info("N%d recusou o token do cluster (UNAUTHENTICATED): confira CLUSTER_TOKEN", peer);
+                    configErrorHandler.accept("N" + peer + " recusou o CLUSTER_TOKEN (UNAUTHENTICATED)");
                 } else if (code == Status.Code.PERMISSION_DENIED) {
                     Log.info("N%d não reconhece este nó (PERMISSION_DENIED): confira PEERS", peer);
+                    configErrorHandler.accept("N" + peer + " não reconhece este nó (PERMISSION_DENIED): confira PEERS");
                 } else {
                     Log.info("N%d inacessível (%s)", peer, code);
                 }

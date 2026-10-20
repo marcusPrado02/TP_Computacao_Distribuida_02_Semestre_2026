@@ -20,6 +20,8 @@ import br.pucminas.cd.aco.round.RoundWorker;
 import br.pucminas.cd.aco.util.Log;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Lado servidor do gRPC. Toda mensagem recebida atualiza o relógio de Lamport
@@ -66,7 +68,20 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
 
     @Override
     public void heartbeat(HeartbeatMsg req, StreamObserver<Ack> obs) {
-        receive(req.getHeader());
+        int from = receive(req.getHeader());
+        if (!req.getMembersList().isEmpty()) {
+            // Handshake: token já foi validado pelo interceptor; aqui validamos o conjunto
+            // completo de membros (self + PEERS), não só "eu te conheço".
+            Set<Integer> theirs = new TreeSet<>(req.getMembersList());
+            Set<Integer> ours = network.members();
+            if (!theirs.equals(ours)) {
+                Log.info("Handshake recusado de N%d: membros %s != %s", from, theirs, ours);
+                obs.onError(Status.FAILED_PRECONDITION
+                        .withDescription("PEERS divergentes: " + theirs + " != " + ours)
+                        .asRuntimeException());
+                return;
+            }
+        }
         ack(obs);
     }
 

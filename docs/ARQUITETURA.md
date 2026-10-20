@@ -71,6 +71,14 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
   Falha → peer marcado como inacessível e re-probado depois de 2 s.
 - Mensagens limitadas a **64 MiB** no cliente e no servidor. O padrão do gRPC (4 MiB) estouraria a
   matriz a partir de ~725 cidades; 64 MiB cobrem ~2900 cidades. Acima disso não há chunking.
+- **Handshake de configuração no startup:** depois de subir o servidor, cada nó faz heartbeat nos
+  peers em background por até `max(3 s, START_DELAY_MS)`. O heartbeat do handshake carrega
+  `members = {self} ∪ PEERS`; o servidor compara o conjunto completo e responde
+  `FAILED_PRECONDITION` se forem diferentes. `UNAUTHENTICATED` (token), `PERMISSION_DENIED`
+  (remetente fora de `PEERS`) ou `FAILED_PRECONDITION` (conjunto de membros diferente) é fatal: o
+  nó registra `ERRO FATAL DE CONFIGURAÇÃO` e encerra com código 2. Peer que ainda está subindo
+  (`UNAVAILABLE`) é tentado de novo; se a janela acabar, o nó segue e avisa quais peers não
+  responderam.
 
 ### 5.2 Eleição de líder — Bully (`election/`)
 - Nó envia `Election` a todos de id maior. Ninguém responde OK → vira líder e envia `Coordinator`.
@@ -129,9 +137,11 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
   `1/ROUNDS` e retransmite a matriz inicial. O `RoundWorker` ignora rodadas repetidas (não refaz a
   SC e responde), mas o líder ainda re-executa as rodadas. Falta transferir estado/catch-up antes
   de assumir.
-- **Token/PEERS divergentes = split-brain silencioso.** Cada nó se elege líder e roda o ACO sozinho;
-  os logs mostram `UNAUTHENTICATED`/`PERMISSION_DENIED`, mas o processo continua. Falta um handshake
-  de startup que falhe rápido.
+- **Token/PEERS divergentes = split-brain silencioso.** O handshake de startup confere token,
+  remetente e o conjunto completo `{self} ∪ PEERS`; `UNAUTHENTICATED`, `PERMISSION_DENIED` e
+  `FAILED_PRECONDITION` encerram o nó. Ainda não há detecção quando dois grupos não compartilham
+  nenhum membro (formam clusters isolados, sem tráfego entre si) nem hash/assinatura do conjunto;
+  `PEERS` continua em texto claro.
 - **Heartbeat pode gerar falso positivo sob carga.** Timeout de 1 s e 5 faltas (~5 s); com milhares
   de rodadas por segundo e instância grande, o heartbeat pode atrasar e provocar eleição
   desnecessária. Não ocorreu no cenário padrão (30 rodadas).
@@ -153,10 +163,11 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
 | `PheromoneMatrixTest` | *lost update* sem exclusão mútua (réplicas divergem) vs. convergência com SC |
 | `BullyElectionTest` | maior vivo vence, contestação de id menor |
 | `RoundWorkerTest` | rodada repetida não reaplica feromônio e responde ao coordenador |
+| `HandshakeTest` | classifica token errado (`AUTH`), remetente fora de PEERS (`PEERS`), conjunto de membros diferente (`PEERS`) e configuração correta (`OK`) |
 | `TspInstanceTest` | TSPLIB válido, outra seção (`DISPLAY_DATA_SECTION`), arquivo vazio, < 3 cidades, linha malformada, vizinho mais próximo |
 | `ClusterIntegrationTest` | 3 nós com gRPC real: elege N3, rodadas, réplicas idênticas, failover do líder, queda de seguidor sem travar, token/remetente recusados |
 
-Total: 37 testes (`mvn test` no container, ~10 s).
+Total: 38 testes (`mvn test` no container, ~10 s).
 
 ## 8. Parâmetros (variáveis de ambiente)
 

@@ -51,6 +51,9 @@ message CoordinatorMsg {
 
 message HeartbeatMsg {
   Header header = 1;
+  // Preenchido só no handshake de startup: conjunto {self} ∪ PEERS, ordenado.
+  // Vazio em heartbeat normal (o servidor não confere nesse caso).
+  repeated int32 members = 2;
 }
 
 // request_ts é o timestamp de Lamport do pedido (fixo durante toda a espera),

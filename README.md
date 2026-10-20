@@ -20,7 +20,7 @@ Tudo roda em containers; não é preciso ter Java/Maven instalado no host.
 
 ```bash
 docker build --target build -t aco-build .
-docker run --rm aco-build mvn -B test   # 37 testes (unitários + integração), ~10 s
+docker run --rm aco-build mvn -B test   # 38 testes (unitários + integração), ~10 s
 docker compose up --build               # cluster de 4 nós
 ```
 
@@ -40,6 +40,10 @@ Gere um token por grupo e **não o versione**:
 cp .env.example .env
 sed -i "s/troque-este-token/$(openssl rand -hex 16)/" .env
 ```
+
+Cada nó valida token e `PEERS` no startup: se um peer recusar a credencial, não reconhecer o
+remetente ou tiver um conjunto de membros diferente, ele registra `ERRO FATAL DE CONFIGURAÇÃO` e
+encerra com código 2, em vez de rodar um cluster paralelo em silêncio.
 
 ## Rodar com Docker Compose (4 nós)
 

@@ -7,7 +7,7 @@
 
 - Revisão de todo o código de produção e dos testes (protocolos, relógio, RPC, ACO, rodadas,
   configuração e ciclo de vida).
-- Suíte completa em container (`mvn test`): 37 testes, executada 5× seguidas sem falha.
+- Suíte completa em container (`mvn test`): 38 testes, executada 5× seguidas sem falha.
 - Cluster real de 4 nós via Docker Compose (60 cidades, 40 formigas), com parada de líder,
   parada de seguidor e reinício de líder.
 - Programas de scratch fora do repositório para forçar cenários que os testes não cobriam
@@ -27,7 +27,7 @@
 | F6 | Média | Líder reiniciado volta a `lastRound = 0`, recomeça em 1 e retransmite a matriz inicial (progresso das réplicas é perdido). | Compose: N4 reiniciou e executou 1/4000 novamente; seguidores não refizeram a SC. | **Mitigado**: rodada repetida não reaplica feromônio e responde (`RoundWorkerTest`). Correção completa (transferência de estado/epoch) fica para a Entrega 2. |
 | F7 | Alta | TSPLIB: `DISPLAY_DATA_SECTION` causava `ArrayIndexOutOfBoundsException`; arquivo vazio estourava no startup; 2 cidades eram aceitas. | Execução real do JAR com os três arquivos. | Corrigido: parser para em outra `_SECTION`, valida a seção, a linha e o mínimo de 3 cidades; `NodeMain` imprime erro claro. Testes em `TspInstanceTest`. |
 | F8 | Média | Limite padrão de 4 MiB do gRPC: matriz de ~725+ cidades falhava com `RESOURCE_EXHAUSTED` (e o peer era marcado como morto). | Mensagem de 4,8 MB rejeitada com "exceeds maximum size 4194304". | Corrigido: 64 MiB no servidor e nos stubs (~2900 cidades). Mensagem de 4,8 MB agora chega ao handler. |
-| F9 | Média | `CLUSTER_TOKEN` diferente: cada nó se elege líder e roda o ACO sozinho; só aparece `inacessível (UNAUTHENTICATED)`. | Dois nós com tokens distintos: ambos líderes, ambos terminaram suas rodadas. | **Não corrigido**: logs agora distinguem `UNAUTHENTICATED` (token) de `PERMISSION_DENIED` (PEERS). Recomendado handshake de startup que falhe rápido. |
+| F9 | Média | `CLUSTER_TOKEN`/`PEERS` divergentes: cada nó se elegia líder e rodava o ACO sozinho; só aparecia `inacessível (UNAUTHENTICATED)`. | Dois nós com tokens distintos: ambos líderes e ambos terminaram suas rodadas. | **Mitigado**: handshake de startup confere token, remetente e o conjunto completo `{self} ∪ PEERS`; `AUTH`/`PEERS`/`FAILED_PRECONDITION` encerram com `ERRO FATAL DE CONFIGURAÇÃO` (código 2). `HandshakeTest` cobre os quatro casos. Grupos que não compartilham nenhum membro ainda não são detectados. |
 | F10 | Baixa | Sem `.dockerignore`, o contexto enviava `.git`, `target` e potencialmente `.env` ao daemon. | Contexto de build caiu para ~71 kB após o arquivo. | Corrigido: `.dockerignore` (inclui `.env`). |
 | F11 | Baixa | Ordem de `close()` derrubava módulos antes do servidor; `sendReply` podia lançar `RejectedExecutionException` durante o shutdown. | Revisão + cenário de parada. | Corrigido: servidor para primeiro, espera handlers; `sendReply` ignora rejeição no shutdown. |
 | F12 | Baixa | `Coordinator` aceitava `leader_id` diferente do remetente. | Revisão. | Corrigido: `NodeServiceImpl` ignora anúncio inconsistente. |
@@ -44,14 +44,17 @@
    sobrescrever a matriz de todos. É o item mais importante de controle de réplicas.
 4. **Catch-up de líder**: reinício retrocede rodadas e reseta a matriz. O `RoundWorker` evita o
    retrabalho nos seguidores, mas o líder ainda recomeça.
-5. **Split-brain por configuração divergente** (token/PEERS). Um handshake no startup resolveria.
+5. **Configuração divergente**: token, remetente desconhecido e conjunto de membros diferente agora
+   são fatais no handshake. Ainda falta detectar grupos que não compartilham nenhum membro (cada um
+   fica com um cluster isolado, sem tráfego entre eles); um hash assinado do conjunto de membros
+   resolveria.
 6. **Sem TLS**, sem persistência, sem chunking de matriz acima de ~2900 cidades.
 
 ## Como reproduzir a verificação
 
 ```bash
 docker build --target build -t aco-build .
-docker run --rm aco-build mvn -B test
+docker run --rm aco-build mvn -B test   # inclui HandshakeTest, TspInstanceTest e ClusterIntegrationTest
 
 # cluster real (o .env precisa existir com CLUSTER_TOKEN)
 docker compose up --build
