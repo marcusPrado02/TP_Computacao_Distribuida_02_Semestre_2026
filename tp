@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Atalho: ./tp (menu) ou ./tp help. Implementação em scripts/tp.sh
+exec "$(dirname "$0")/scripts/tp.sh" "$@"

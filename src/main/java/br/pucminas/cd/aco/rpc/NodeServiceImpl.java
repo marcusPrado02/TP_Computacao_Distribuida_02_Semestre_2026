@@ -23,6 +23,19 @@ import io.grpc.stub.StreamObserver;
 /**
  * Lado servidor do gRPC. Toda mensagem recebida atualiza o relógio de Lamport
  * e é delegada ao módulo responsável. Nenhum handler bloqueia.
+ *
+ * <p>Ordem de processamento de cada chamada:
+ * <ol>
+ *   <li>{@code ClusterAuth} já rejeitou chamadas sem o token do cluster;</li>
+ *   <li>{@link #receive} rejeita remetentes fora de PEERS e aplica {@code onReceive} no relógio;</li>
+ *   <li>o módulo responsável trata a mensagem;</li>
+ *   <li>a resposta ({@code Ack}) leva um cabeçalho novo, ou seja, mais um evento de envio.</li>
+ * </ol>
+ *
+ * <p>Handlers não bloqueantes são essenciais: um handler de {@code RequestCS} que esperasse a seção
+ * crítica liberar prenderia threads do servidor e poderia gerar deadlock distribuído. Por isso a
+ * permissão volta num RPC separado ({@code ReplyCS}). Os handlers rodam em threads do gRPC,
+ * concorrentemente; os módulos chamados são thread-safe.
  */
 public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     private final LamportClock clock;
@@ -32,6 +45,7 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     private final RoundWorker worker;
     private final RoundSink coordinator;
 
+    /** Recebe os módulos para os quais as mensagens são delegadas. */
     public NodeServiceImpl(LamportClock clock, PeerNetwork network, BullyElection election,
                            RicartAgrawala mutex, RoundWorker worker, RoundSink coordinator) {
         this.clock = clock;

@@ -21,8 +21,16 @@ import java.util.concurrent.Executors;
  * <p>Tolerância mínima a falhas (só para não travar): peer inacessível ao receber o REQUEST conta como
  * permissão, e peer que deixa de constar como vivo durante a espera deixa de ser aguardado.
  * Isso pode violar a exclusão se o peer só estava lento; ver "Limitações" em docs/ARQUITETURA.md.
+ *
+ * <p>Custo: 2(N − 1) mensagens por entrada na seção crítica (N − 1 REQUESTs e N − 1 REPLYs).
+ *
+ * <p>Thread-safety: todo o estado é protegido pelo monitor de {@code this}. {@link #acquire} roda na
+ * thread do trabalhador e espera com {@code wait}; {@link #onRequest} e {@link #onReply} são chamados
+ * pelos handlers gRPC e acordam a espera com {@code notifyAll}. Os REQUESTs saem por virtual threads
+ * para não bloquear segurando o lock.
  */
 public final class RicartAgrawala implements AutoCloseable {
+    /** RELEASED: fora e sem interesse; WANTED: pediu e espera REPLYs; HELD: dentro da seção crítica. */
     enum State { RELEASED, WANTED, HELD }
 
     /** Intervalo para reavaliar quem ainda está vivo enquanto espera os REPLYs. */
@@ -37,7 +45,7 @@ public final class RicartAgrawala implements AutoCloseable {
     private State state = State.RELEASED;
     private long requestTs;
     private final Set<Integer> awaiting = new HashSet<>();
-    /** Pedidos adiados: id do solicitante -> timestamp do pedido dele. */
+    /** Pedidos adiados: id do solicitante -&gt; timestamp do pedido dele. */
     private final Map<Integer, Long> deferred = new HashMap<>();
 
     public RicartAgrawala(int selfId, LamportClock clock, MutexTransport transport) {
@@ -46,7 +54,16 @@ public final class RicartAgrawala implements AutoCloseable {
         this.transport = transport;
     }
 
-    /** Bloqueia até obter permissão de todos os peers vivos. */
+    /**
+     * Bloqueia até obter permissão de todos os peers vivos.
+     *
+     * <p>O timestamp do pedido é um {@code tick()} do relógio de Lamport, fixo durante toda a espera.
+     * A espera usa {@code wait} com timeout para reavaliar periodicamente quem ainda está vivo,
+     * em vez de depender só de um {@code notifyAll} que pode nunca chegar se o peer morreu.
+     *
+     * @throws IllegalStateException se chamado de novo antes do {@link #release}
+     * @throws InterruptedException  se a thread for interrompida; o pedido é abandonado
+     */
     public void acquire() throws InterruptedException {
         long ts;
         Set<Integer> targets;
@@ -112,6 +129,7 @@ public final class RicartAgrawala implements AutoCloseable {
         notifyAll();
     }
 
+    /** Estado atual (usado pelos testes). */
     synchronized State state() {
         return state;
     }

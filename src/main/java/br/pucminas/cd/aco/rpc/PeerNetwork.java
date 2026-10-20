@@ -37,9 +37,19 @@ import java.util.function.Function;
 /**
  * Lado cliente do gRPC: canais para cada peer, carimbo de Lamport em toda mensagem
  * e visão de quais peers estão vivos (atualizada a cada chamada).
+ *
+ * <p>Detector de falhas implícito: toda chamada tem deadline. Sucesso marca o peer como vivo;
+ * erro (timeout, conexão recusada) o marca como inacessível. Esse conjunto ({@link #alivePeers})
+ * alimenta o Ricart-Agrawala e o coordenador de rodadas.
+ *
+ * <p>Thread-safety: canais e stubs são criados no construtor e só lidos depois (stubs gRPC são
+ * thread-safe); {@code alive} é um conjunto concorrente. Envios em broadcast e assíncronos usam
+ * virtual threads, baratas o bastante para uma por chamada.
  */
 public final class PeerNetwork implements MutexTransport, ElectionTransport, AutoCloseable {
+    /** Deadline das mensagens de controle (eleição, heartbeat, mutex, rodadas). */
     private static final long FAST_TIMEOUT_MS = 500;
+    /** Deadline do envio da matriz de feromônio (n² doubles, mensagem bem maior). */
     private static final long BROADCAST_TIMEOUT_MS = 2_000;
 
     private final int selfId;
@@ -49,6 +59,10 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     private final Set<Integer> alive = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
+    /**
+     * Abre um canal (sem TLS) para cada peer; todos começam marcados como vivos.
+     * Os canais conectam sob demanda, então o peer não precisa estar no ar ainda.
+     */
     public PeerNetwork(int selfId, LamportClock clock, Map<Integer, String> peers, String clusterToken) {
         this.selfId = selfId;
         this.clock = clock;
@@ -97,6 +111,7 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
 
     // ---------------------------------------------------------------- Exclusão mútua
 
+    /** Retrato imutável dos peers vivos neste momento. */
     @Override
     public Set<Integer> alivePeers() {
         return Set.copyOf(alive);
@@ -116,6 +131,7 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
 
     // ---------------------------------------------------------------- Rodadas ACO
 
+    /** Líder avisa todos os peers do início da rodada (assíncrono, não espera os acks). */
     public void broadcastStartRound(int round) {
         for (int id : stubs.keySet()) {
             executor.submit(() -> ack(id, FAST_TIMEOUT_MS, s -> s.startRound(
@@ -123,6 +139,7 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
         }
     }
 
+    /** Informa ao líder a melhor rota local da rodada (síncrono). */
     public void sendRoundDone(int leader, int round, Tour tour) {
         ack(leader, FAST_TIMEOUT_MS, s -> s.roundDone(RoundResult.newBuilder()
                 .setHeader(header())
@@ -132,7 +149,12 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
                 .build()));
     }
 
-    /** Envia a matriz a todos os peers e espera as confirmações (chamado dentro da seção crítica). */
+    /**
+     * Envia a matriz a todos os peers e espera as confirmações (chamado dentro da seção crítica).
+     *
+     * <p>Esperar os acks antes de sair da seção crítica garante que o próximo nó a entrar já tem
+     * a matriz atualizada. Os envios são paralelos, então o tempo é o do peer mais lento.
+     */
     public void broadcastPheromone(int round, double[] tau, Tour best) {
         PheromoneUpdate base = PheromoneUpdate.newBuilder()
                 .setRound(round)

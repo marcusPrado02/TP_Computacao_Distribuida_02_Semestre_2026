@@ -15,6 +15,9 @@ import java.security.MessageDigest;
  * Toda chamada leva o header "x-cluster-token"; o servidor rejeita quem não o apresenta.
  *
  * <p>Limitação: sem TLS o token trafega em claro na rede local.
+ *
+ * <p>Implementado com interceptors do gRPC: o do cliente anexa o header a toda chamada; o do servidor
+ * roda antes de qualquer handler e encerra a chamada com {@code UNAUTHENTICATED} se o token falhar.
  */
 public final class ClusterAuth {
     static final Metadata.Key<String> TOKEN_KEY =

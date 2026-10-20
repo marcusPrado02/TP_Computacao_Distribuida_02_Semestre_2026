@@ -7,6 +7,8 @@ import java.util.function.Function;
 
 /**
  * Configuração de um nó, lida de variáveis de ambiente.
+ *
+ * <p>Imutável (record, com {@code peers} não modificável), portanto segura para compartilhar entre threads.
  * O mesmo formato serve para Docker Compose e para execução direta na LAN.
  *
  * <p>Os valores são validados na construção: um nó mal configurado falha na subida,
@@ -27,6 +29,23 @@ public record NodeConfig(
         double rho,
         long startDelayMs) {
 
+    /**
+     * Normaliza e valida os valores.
+     *
+     * @param nodeId       id único e positivo do nó (NODE_ID); maior id vence a eleição
+     * @param port         porta do servidor gRPC (NODE_PORT)
+     * @param peers        id -&gt; "host:porta" dos outros nós (PEERS)
+     * @param clusterToken segredo compartilhado do cluster (CLUSTER_TOKEN)
+     * @param tspFile      arquivo TSPLIB opcional (TSP_FILE); null usa instância aleatória
+     * @param tspCities    número de cidades da instância aleatória (TSP_CITIES)
+     * @param tspSeed      semente da instância aleatória e das formigas (TSP_SEED)
+     * @param rounds       total de rodadas (ROUNDS)
+     * @param ants         formigas por nó por rodada (ANTS)
+     * @param alpha        peso do feromônio (ALPHA)
+     * @param beta         peso da visibilidade 1/d (BETA)
+     * @param rho          taxa de evaporação em (0, 1] (RHO)
+     * @param startDelayMs espera do líder antes da primeira rodada (START_DELAY_MS)
+     */
     public NodeConfig {
         if (tspFile != null && tspFile.isBlank()) tspFile = null; // TSP_FILE="" = não definido
         require(nodeId > 0, "NODE_ID deve ser positivo (o Bully compara ids)");
@@ -43,6 +62,7 @@ public record NodeConfig(
         peers = Collections.unmodifiableMap(new LinkedHashMap<>(peers));
     }
 
+    /** Lê e valida a configuração das variáveis de ambiente, aplicando os valores padrão. */
     public static NodeConfig fromEnv() {
         return new NodeConfig(
                 parse("NODE_ID", requireEnv("NODE_ID"), Integer::parseInt),

@@ -5,8 +5,19 @@ import java.util.SplittableRandom;
 import java.util.stream.IntStream;
 
 /**
- * Formigas locais de um nó. Cada formiga constrói uma rota escolhendo a próxima cidade
+ * Formigas locais de um nó (Ant System). Cada formiga constrói uma rota escolhendo a próxima cidade
  * com probabilidade proporcional a τ^α · η^β, onde η = 1/distância.
+ *
+ * <p>Para uma formiga na cidade i, a chance de ir para a cidade j ainda não visitada é
+ * <pre>
+ *   p(i, j) = τ[i][j]^α · η[i][j]^β / Σ_k (τ[i][k]^α · η[i][k]^β)
+ * </pre>
+ * α pesa a "memória coletiva" (feromônio) e β pesa a gula (cidades próximas). Com α = 0 vira
+ * uma busca gulosa aleatorizada; com β = 0 ignora as distâncias.
+ *
+ * <p>Thread-safety: imutável depois de construída. {@link #runAnts} roda as formigas em paralelo
+ * (parallel stream); cada formiga tem seu próprio gerador e só lê a matriz {@code tau} recebida,
+ * que deve ser um snapshot que ninguém mais altera.
  */
 public final class AntColony {
     private final TspInstance tsp;
@@ -19,6 +30,7 @@ public final class AntColony {
         this.alpha = alpha;
         this.beta = beta;
         int n = tsp.size();
+        // η^β não muda durante a execução: pré-calcular evita Math.pow no laço mais quente.
         this.etaPow = new double[n][n];
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
@@ -27,7 +39,13 @@ public final class AntColony {
         }
     }
 
-    /** Executa {@code ants} formigas em paralelo (núcleos da máquina) e devolve a melhor rota. */
+    /**
+     * Executa {@code ants} formigas em paralelo (núcleos da máquina) e devolve a melhor rota.
+     *
+     * @param tau  snapshot da matriz de feromônio (somente leitura)
+     * @param ants número de formigas
+     * @param seed semente; a mesma semente reproduz exatamente as mesmas rotas
+     */
     public Tour runAnts(double[][] tau, int ants, long seed) {
         return IntStream.range(0, ants)
                 .parallel()
@@ -36,6 +54,7 @@ public final class AntColony {
                 .orElseThrow();
     }
 
+    /** Constrói uma rota completa a partir de uma cidade inicial sorteada. */
     private Tour buildTour(double[][] tau, SplittableRandom rnd) {
         int n = tsp.size();
         int[] path = new int[n];
@@ -57,6 +76,10 @@ public final class AntColony {
         return new Tour(path, tsp.tourLength(path));
     }
 
+    /**
+     * Seleção por roleta: sorteia r em [0, total) e percorre as candidatas subtraindo os pesos;
+     * a cidade em que r fica &lt;= 0 é a escolhida. Cidades com peso maior ocupam fatias maiores.
+     */
     private static int roulette(double[] weights, double total, boolean[] visited, SplittableRandom rnd) {
         double r = rnd.nextDouble() * total;
         int last = -1;

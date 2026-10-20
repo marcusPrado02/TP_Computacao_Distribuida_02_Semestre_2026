@@ -1,6 +1,11 @@
 package br.pucminas.cd.aco.aco;
 
-/** Melhor rota global conhecida por este nó (propagada junto com o feromônio). */
+/**
+ * Melhor rota global conhecida por este nó (propagada junto com o feromônio).
+ *
+ * <p>Só aceita rotas estritamente menores, então o valor nunca piora. Thread-safe: os métodos são
+ * {@code synchronized} porque a rota é oferecida pelo trabalhador local e por handlers gRPC.
+ */
 public final class BestTracker {
     private Tour best;
 
@@ -13,6 +18,7 @@ public final class BestTracker {
         return false;
     }
 
+    /** Melhor rota até agora, ou null se nenhuma foi oferecida. */
     public synchronized Tour get() {
         return best;
     }
