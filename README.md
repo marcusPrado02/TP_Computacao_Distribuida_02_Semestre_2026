@@ -6,6 +6,7 @@ Colônia de Formigas (ACO) resolvendo o Caixeiro-Viajante em vários nós Java q
 **Entrega 1:** gRPC · eleição de líder (Bully) · relógio lógico (Lamport) · exclusão mútua (Ricart-Agrawala).
 
 - Arquitetura e decisões: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md)
+- Enunciado do trabalho: [`docs/ENUNCIADO.md`](docs/ENUNCIADO.md)
 - Plano e divisão de tarefas: [`TODO.md`](TODO.md)
 
 ## Requisitos

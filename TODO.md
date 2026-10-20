@@ -15,7 +15,8 @@ Cada pessoa é dona de um módulo e precisa conseguir explicá-lo na arguição.
 > Preencher os nomes: A = ____, B = ____, C = ____, D = ____
 
 ## Semana 1 — entender e fechar o núcleo
-- [ ] Todos: ler `docs/ARQUITETURA.md`, rodar `mvn test` e `docker compose up`
+- [ ] Todos: ler `docs/ARQUITETURA.md`, rodar testes e cluster **só com Docker** (sem Java/Maven no host):
+      `docker build --target build -t aco-build .` → `docker run --rm aco-build mvn -B test` → `docker compose up --build`
 - [x] D: implementar `RicartAgrawala.shouldDefer` até `RicartAgrawalaTest` passar
 - [ ] A: validar build + compose em pelo menos 2 máquinas do grupo
 - [ ] B: baixar `berlin52.tsp` (TSPLIB) para `data/` e testar com `TSP_FILE`
