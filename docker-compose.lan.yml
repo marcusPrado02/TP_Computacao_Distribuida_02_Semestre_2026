@@ -1,0 +1,85 @@
+# Ensaio de "máquinas físicas" em uma única máquina.
+#
+# Cada nó tem IP fixo e os PEERS apontam para IPs — nunca para nomes de serviço.
+# O caminho de rede exercitado é o mesmo da LAN (host:porta via socket TCP), e não o
+# DNS interno do compose do arquivo docker-compose.yml. Isso pega os bugs de rede
+# (timeout curto, nó que sobe depois dos outros) antes de espalhar o cluster.
+#
+#   CLUSTER_TOKEN=$(openssl rand -hex 16) docker compose -f docker-compose.lan.yml up --build
+#   docker compose -f docker-compose.lan.yml logs -f
+#   docker compose -f docker-compose.lan.yml stop node4    # failover: N3 assume
+#   docker compose -f docker-compose.lan.yml down
+name: aco-lan
+
+x-node: &node
+  build: .
+  image: aco-node:latest
+  restart: "no"
+
+# Tempos maiores que o padrão: em LAN real (Wi-Fi/roteador) 500 ms é apertado e um
+# heartbeat perdido por latência vira eleição desnecessária. Ver docs/LAN.md.
+x-env: &env
+  NODE_PORT: "50051"
+  CLUSTER_TOKEN: "${CLUSTER_TOKEN:?defina CLUSTER_TOKEN (cp .env.example .env ou passe na linha de comando)}"
+  TSP_CITIES: "60"
+  TSP_SEED: "42"
+  ROUNDS: "${ROUNDS:-30}"
+  ANTS: "${ANTS:-40}"
+  START_DELAY_MS: "2000"
+  RPC_TIMEOUT_MS: "1500"
+  BROADCAST_TIMEOUT_MS: "5000"
+  COORDINATOR_TIMEOUT_MS: "8000"
+  PEER_WAIT_MS: "120000"
+
+networks:
+  aco-lan:
+    driver: bridge
+    ipam:
+      config:
+        # Fora de 172.17–172.31, faixa que o Docker usa por padrão em outras redes.
+        - subnet: 10.213.0.0/24
+
+services:
+  node1:
+    <<: *node
+    hostname: node1
+    environment:
+      <<: *env
+      NODE_ID: "1"
+      PEERS: "2=10.213.0.12:50051,3=10.213.0.13:50051,4=10.213.0.14:50051"
+    networks:
+      aco-lan:
+        ipv4_address: 10.213.0.11
+
+  node2:
+    <<: *node
+    hostname: node2
+    environment:
+      <<: *env
+      NODE_ID: "2"
+      PEERS: "1=10.213.0.11:50051,3=10.213.0.13:50051,4=10.213.0.14:50051"
+    networks:
+      aco-lan:
+        ipv4_address: 10.213.0.12
+
+  node3:
+    <<: *node
+    hostname: node3
+    environment:
+      <<: *env
+      NODE_ID: "3"
+      PEERS: "1=10.213.0.11:50051,2=10.213.0.12:50051,4=10.213.0.14:50051"
+    networks:
+      aco-lan:
+        ipv4_address: 10.213.0.13
+
+  node4:
+    <<: *node
+    hostname: node4
+    environment:
+      <<: *env
+      NODE_ID: "4"
+      PEERS: "1=10.213.0.11:50051,2=10.213.0.12:50051,3=10.213.0.13:50051"
+    networks:
+      aco-lan:
+        ipv4_address: 10.213.0.14

@@ -39,19 +39,29 @@ import java.util.function.Function;
  * e visão de quais peers estão vivos (atualizada a cada chamada).
  */
 public final class PeerNetwork implements MutexTransport, ElectionTransport, AutoCloseable {
-    private static final long FAST_TIMEOUT_MS = 500;
-    private static final long BROADCAST_TIMEOUT_MS = 2_000;
+    /** Padrões para loopback/compose; em LAN o nó usa os valores de {@code NodeConfig.Timeouts}. */
+    static final long DEFAULT_FAST = 500;
+    static final long DEFAULT_BROADCAST = 2_000;
 
     private final int selfId;
     private final LamportClock clock;
+    private final long fastTimeoutMs;
+    private final long broadcastTimeoutMs;
     private final Map<Integer, ManagedChannel> channels = new HashMap<>();
     private final Map<Integer, NodeServiceBlockingStub> stubs = new HashMap<>();
     private final Set<Integer> alive = ConcurrentHashMap.newKeySet();
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
     public PeerNetwork(int selfId, LamportClock clock, Map<Integer, String> peers, String clusterToken) {
+        this(selfId, clock, peers, clusterToken, DEFAULT_FAST, DEFAULT_BROADCAST);
+    }
+
+    public PeerNetwork(int selfId, LamportClock clock, Map<Integer, String> peers, String clusterToken,
+                       long fastTimeoutMs, long broadcastTimeoutMs) {
         this.selfId = selfId;
         this.clock = clock;
+        this.fastTimeoutMs = fastTimeoutMs;
+        this.broadcastTimeoutMs = broadcastTimeoutMs;
         peers.forEach((id, address) -> {
             ManagedChannel channel = ManagedChannelBuilder.forTarget(address).usePlaintext().build();
             channels.put(id, channel);
@@ -75,7 +85,7 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
 
     @Override
     public boolean sendElection(int to) {
-        return call(to, FAST_TIMEOUT_MS,
+        return call(to, fastTimeoutMs,
                 s -> s.election(ElectionMsg.newBuilder().setHeader(header()).build()),
                 ElectionReply::getHeader)
                 .map(ElectionReply::getOk)
@@ -85,14 +95,14 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     @Override
     public void broadcastCoordinator() {
         for (int id : stubs.keySet()) {
-            executor.submit(() -> ack(id, FAST_TIMEOUT_MS, s -> s.coordinator(
+            executor.submit(() -> ack(id, fastTimeoutMs, s -> s.coordinator(
                     CoordinatorMsg.newBuilder().setHeader(header()).setLeaderId(selfId).build())));
         }
     }
 
     @Override
     public boolean heartbeat(int to) {
-        return ack(to, FAST_TIMEOUT_MS, s -> s.heartbeat(HeartbeatMsg.newBuilder().setHeader(header()).build()));
+        return ack(to, fastTimeoutMs, s -> s.heartbeat(HeartbeatMsg.newBuilder().setHeader(header()).build()));
     }
 
     // ---------------------------------------------------------------- Exclusão mútua
@@ -104,13 +114,13 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
 
     @Override
     public boolean sendRequest(int to, long timestamp) {
-        return ack(to, FAST_TIMEOUT_MS, s -> s.requestCS(
+        return ack(to, fastTimeoutMs, s -> s.requestCS(
                 CsRequest.newBuilder().setHeader(header()).setRequestTs(timestamp).build()));
     }
 
     @Override
     public void sendReply(int to, long requestTs) {
-        executor.submit(() -> ack(to, FAST_TIMEOUT_MS,
+        executor.submit(() -> ack(to, fastTimeoutMs,
                 s -> s.replyCS(CsReply.newBuilder().setHeader(header()).setRequestTs(requestTs).build())));
     }
 
@@ -118,13 +128,13 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
 
     public void broadcastStartRound(int round) {
         for (int id : stubs.keySet()) {
-            executor.submit(() -> ack(id, FAST_TIMEOUT_MS, s -> s.startRound(
+            executor.submit(() -> ack(id, fastTimeoutMs, s -> s.startRound(
                     RoundStart.newBuilder().setHeader(header()).setRound(round).build())));
         }
     }
 
     public void sendRoundDone(int leader, int round, Tour tour) {
-        ack(leader, FAST_TIMEOUT_MS, s -> s.roundDone(RoundResult.newBuilder()
+        ack(leader, fastTimeoutMs, s -> s.roundDone(RoundResult.newBuilder()
                 .setHeader(header())
                 .setRound(round)
                 .addAllTour(Protos.boxed(tour.cities()))
@@ -141,7 +151,10 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
                 .setBestLength(best.length())
                 .build();
         List<Future<Boolean>> pending = stubs.keySet().stream()
-                .map(id -> executor.submit(() -> ack(id, BROADCAST_TIMEOUT_MS,
+                // Peer marcado como morto não deve custar BROADCAST_TIMEOUT_MS em toda rodada.
+                // Trade-off: se ele só estava lento, perde esta atualização (ver "Limitações").
+                .filter(alive::contains)
+                .map(id -> executor.submit(() -> ack(id, broadcastTimeoutMs,
                         s -> s.updatePheromone(base.toBuilder().setHeader(header()).build()))))
                 .toList();
         for (Future<Boolean> f : pending) {

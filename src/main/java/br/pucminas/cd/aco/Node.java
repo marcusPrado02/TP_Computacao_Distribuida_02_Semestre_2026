@@ -58,8 +58,9 @@ public final class Node implements AutoCloseable {
         this.pheromone = new PheromoneMatrix(tsp.size(), 1.0 / (cfg.rho() * nearestNeighbor));
         AntColony colony = new AntColony(tsp, cfg.alpha(), cfg.beta());
 
-        this.network = new PeerNetwork(cfg.nodeId(), clock, cfg.peers(), cfg.clusterToken());
-        this.election = new BullyElection(cfg.nodeId(), network);
+        this.network = new PeerNetwork(cfg.nodeId(), clock, cfg.peers(), cfg.clusterToken(),
+                cfg.timeouts().rpcMs(), cfg.timeouts().broadcastMs());
+        this.election = new BullyElection(cfg.nodeId(), network, cfg.timeouts().electionMs());
         this.monitor = new LeaderMonitor(cfg.nodeId(), election, network);
         this.mutex = new RicartAgrawala(cfg.nodeId(), clock, network);
 
@@ -82,7 +83,10 @@ public final class Node implements AutoCloseable {
     /** Sobe o servidor gRPC e entra no cluster (primeira eleição). */
     public void start() throws IOException {
         server.start();
+        var t = cfg.timeouts();
         Log.info("N%d ouvindo na porta %d; peers = %s", cfg.nodeId(), cfg.port(), cfg.peers());
+        Log.info("Rede: rpc=%d ms, broadcast=%d ms, eleição=%d ms, espera de peers=%d ms",
+                t.rpcMs(), t.broadcastMs(), t.electionMs(), t.peerWaitMs());
         monitor.start();
         election.startElection();
     }

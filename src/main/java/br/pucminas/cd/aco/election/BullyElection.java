@@ -19,10 +19,11 @@ import java.util.function.IntConsumer;
  * </ol>
  */
 public final class BullyElection implements AutoCloseable {
-    private static final long COORDINATOR_TIMEOUT_MS = 3_000;
+    static final long DEFAULT_COORDINATOR_TIMEOUT_MS = 3_000;
 
     private final int selfId;
     private final ElectionTransport transport;
+    private final long coordinatorTimeoutMs;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final AtomicBoolean electing = new AtomicBoolean(false);
     private final List<IntConsumer> listeners = new CopyOnWriteArrayList<>();
@@ -32,8 +33,14 @@ public final class BullyElection implements AutoCloseable {
     private boolean coordinatorSeen; // protegido por lock
 
     public BullyElection(int selfId, ElectionTransport transport) {
+        this(selfId, transport, DEFAULT_COORDINATOR_TIMEOUT_MS);
+    }
+
+    /** @param coordinatorTimeoutMs quanto esperar pelo COORDINATOR antes de reiniciar a eleição (LAN: maior). */
+    public BullyElection(int selfId, ElectionTransport transport, long coordinatorTimeoutMs) {
         this.selfId = selfId;
         this.transport = transport;
+        this.coordinatorTimeoutMs = coordinatorTimeoutMs;
     }
 
     public void onLeaderChange(IntConsumer listener) {
@@ -90,7 +97,7 @@ public final class BullyElection implements AutoCloseable {
     }
 
     private boolean awaitCoordinator() throws InterruptedException {
-        long deadline = System.currentTimeMillis() + COORDINATOR_TIMEOUT_MS;
+        long deadline = System.currentTimeMillis() + coordinatorTimeoutMs;
         synchronized (lock) {
             while (!coordinatorSeen) {
                 long left = deadline - System.currentTimeMillis();

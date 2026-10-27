@@ -67,11 +67,13 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 ### 5.1 RPC — gRPC
 - Um único serviço `NodeService`; cliente em `rpc/PeerNetwork`, servidor em `rpc/NodeServiceImpl`.
 - **Autenticação:** token compartilhado (`CLUSTER_TOKEN`) no header `x-cluster-token`, verificado por um `ServerInterceptor` (`rpc/ClusterAuth`). Sem ele, `UNAUTHENTICATED`. O `sender_id` também precisa estar em `PEERS`; caso contrário, `PERMISSION_DENIED`.
-- Toda chamada tem *deadline* (500 ms; 2 s para o broadcast da matriz). Falha → peer marcado como inacessível.
+- Toda chamada tem *deadline*, configurável por ambiente: 500 ms (`RPC_TIMEOUT_MS`) e 2 s para o
+  broadcast da matriz (`BROADCAST_TIMEOUT_MS`). Em LAN os valores são maiores — ver `docs/LAN.md`.
+  Falha → peer marcado como inacessível.
 
 ### 5.2 Eleição de líder — Bully (`election/`)
 - Nó envia `Election` a todos de id maior. Ninguém responde OK → vira líder e envia `Coordinator`.
-- Alguém responde OK → espera `Coordinator` por 3 s; se não chegar, recomeça.
+- Alguém responde OK → espera `Coordinator` por 3 s (`COORDINATOR_TIMEOUT_MS`); se não chegar, recomeça.
 - `Coordinator` vindo de id **menor** é contestado (nova eleição).
 - Disparo: na inicialização e quando o `LeaderMonitor` perde 3 heartbeats seguidos.
 - Novo líder continua da última rodada vista (`RoundWorker.lastRound()`).
@@ -93,6 +95,17 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 
 **Por que precisa de exclusão mútua?** Cada nó faz *ler matriz → evaporar → depositar → propagar*. Sem a SC, duas atualizações concorrentes se sobrescrevem (*lost update*) e as réplicas divergem.
 
+### 5.5 Coordenação de rodadas e subida em LAN
+
+- O líder espera `START_DELAY_MS` e, **antes da primeira rodada**, faz um heartbeat em cada peer
+  configurado, aguardando até `PEER_WAIT_MS` (`RoundCoordinator.awaitAllPeers`). Em máquinas físicas
+  os nós sobem em instantes diferentes; sem a barreira, o primeiro a subir se elege e roda sozinho.
+  `PEER_WAIT_MS=0` desliga a barreira (testes e compose de uma máquina).
+- A barreira só vale para a rodada 1: num failover o novo líder continua de `lastRound + 1`, sem
+  esperar o nó que caiu.
+- O broadcast da matriz pula peers marcados como inacessíveis; sem isso, toda rodada após uma queda
+  custaria `BROADCAST_TIMEOUT_MS`.
+
 ## 6. Limitações conhecidas (insumo para a Entrega 2)
 
 - Peer inacessível no momento do `RequestCS`, ou marcado como inacessível durante a espera, conta como permissão.
@@ -103,6 +116,8 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
   até o timeout de 30 s da rodada).
 - Rodada perdida na troca de líder é pulada (o novo líder segue de `lastRound + 1`).
 - Réplicas da matriz não têm versão: um nó que volta depois de cair recomeça com a matriz inicial.
+- Peer pulado no broadcast por estar marcado como inacessível perde aquela atualização. Se ele só
+  estava lento, sai da rodada com a réplica atrasada até a próxima atualização.
 - Segurança: sem TLS, o token trafega em claro na LAN. Um membro com o token ainda consegue forjar o `sender_id` de outro membro. A solução completa é mTLS com um certificado por nó.
 - Os itens de falha/réplica acima são tratamento de falhas / controle de réplicas: escopo da Entrega 2.
 
@@ -129,3 +144,7 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 | `ROUNDS` / `ANTS` | 30 / 40 | rodadas totais / formigas por nó por rodada |
 | `ALPHA` / `BETA` / `RHO` | 1.0 / 3.0 / 0.1 | parâmetros ACO |
 | `START_DELAY_MS` | 5000 | espera do líder antes da 1ª rodada |
+| `RPC_TIMEOUT_MS` | 500 | deadline das chamadas curtas (LAN: 1500) |
+| `BROADCAST_TIMEOUT_MS` | 2000 | deadline do broadcast da matriz (LAN: 5000) |
+| `COORDINATOR_TIMEOUT_MS` | 3000 | espera pelo `COORDINATOR` na eleição (LAN: 8000) |
+| `PEER_WAIT_MS` | 0 | barreira de subida antes da 1ª rodada; 0 desliga (LAN: 120000) |

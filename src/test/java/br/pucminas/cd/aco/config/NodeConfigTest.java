@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 class NodeConfigTest {
 
     private static NodeConfig config(int id, Map<Integer, String> peers, double rho) {
-        return new NodeConfig(id, 50051, peers, "token", null, 10, 42, 5, 4, 1.0, 3.0, rho, 0);
+        return new NodeConfig(id, 50051, peers, "token", null, 10, 42, 5, 4, 1.0, 3.0, rho, 0,
+                NodeConfig.Timeouts.defaults());
     }
 
     @Test
@@ -37,7 +38,22 @@ class NodeConfigTest {
 
     @Test
     void tspFileVazioEquivaleAAusente() {
-        NodeConfig cfg = new NodeConfig(1, 50051, Map.of(), "token", " ", 10, 42, 5, 4, 1.0, 3.0, 0.1, 0);
+        NodeConfig cfg = new NodeConfig(1, 50051, Map.of(), "token", " ", 10, 42, 5, 4, 1.0, 3.0, 0.1, 0,
+                NodeConfig.Timeouts.defaults());
         assertNull(cfg.tspFile());
+    }
+
+    @Test
+    void rejeitaTimeoutsInvalidos() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new NodeConfig.Timeouts(0, 2_000, 3_000, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> new NodeConfig.Timeouts(500, 2_000, 3_000, -1));
+    }
+
+    @Test
+    void timeoutsAusentesUsamOsPadroes() {
+        NodeConfig cfg = new NodeConfig(1, 50051, Map.of(), "token", null, 10, 42, 5, 4, 1.0, 3.0, 0.1, 0, null);
+        assertEquals(NodeConfig.Timeouts.defaults(), cfg.timeouts());
     }
 }

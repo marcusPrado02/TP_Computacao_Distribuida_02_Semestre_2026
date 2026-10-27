@@ -5,8 +5,10 @@ import br.pucminas.cd.aco.aco.Tour;
 import br.pucminas.cd.aco.config.NodeConfig;
 import br.pucminas.cd.aco.rpc.PeerNetwork;
 import br.pucminas.cd.aco.util.Log;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,6 +58,7 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
         try {
             Thread.sleep(cfg.startDelayMs()); // dá tempo dos peers subirem / eleição estabilizar
             int round = worker.lastRound() + 1; // novo líder continua de onde o anterior parou
+            if (round == 1) awaitAllPeers(); // só na 1ª rodada: em LAN os nós sobem em instantes diferentes
             while (isLeader.getAsBoolean() && round <= cfg.rounds()) {
                 Set<Integer> participants = new HashSet<>(network.alivePeers());
                 participants.add(cfg.nodeId());
@@ -90,6 +93,35 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
     /** true depois que este nó, como líder, concluiu a última rodada. */
     public boolean isFinished() {
         return finished.get();
+    }
+
+    /**
+     * Barreira de subida: antes da 1ª rodada, espera todos os peers configurados responderem um
+     * heartbeat, até {@code PEER_WAIT_MS}. Sem isso, em máquinas físicas o primeiro nó a subir se
+     * elege líder e começa as rodadas sozinho, enquanto os outros ainda estão iniciando.
+     * {@code PEER_WAIT_MS=0} desliga (padrão em testes e no compose de uma máquina).
+     */
+    private void awaitAllPeers() throws InterruptedException {
+        long waitMs = cfg.timeouts().peerWaitMs();
+        if (waitMs <= 0) return;
+        long deadline = System.currentTimeMillis() + waitMs;
+        while (isLeader.getAsBoolean()) {
+            List<Integer> missing = new ArrayList<>();
+            for (int id : network.allPeers()) {
+                if (!network.heartbeat(id)) missing.add(id);
+            }
+            if (missing.isEmpty()) {
+                Log.info("LÍDER: todos os %d peers responderam; iniciando as rodadas", cfg.peers().size());
+                return;
+            }
+            long left = deadline - System.currentTimeMillis();
+            if (left <= 0) {
+                Log.info("LÍDER: peers %s não responderam em %d ms; seguindo sem eles", missing, waitMs);
+                return;
+            }
+            Log.info("LÍDER: aguardando peers %s subirem (%d ms restantes)", missing, left);
+            Thread.sleep(Math.min(POLL_MS, left));
+        }
     }
 
     @Override

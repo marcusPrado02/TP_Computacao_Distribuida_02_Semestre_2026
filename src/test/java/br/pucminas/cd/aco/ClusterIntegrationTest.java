@@ -106,7 +106,8 @@ class ClusterIntegrationTest {
                 if (other != id) peers.put(other, "localhost:" + ports[other - 1]);
             }
             NodeConfig cfg = new NodeConfig(id, ports[id - 1], peers, TOKEN, null,
-                    12, 7, rounds, 5, 1.0, 3.0, 0.1, 500);
+                    12, 7, rounds, 5, 1.0, 3.0, 0.1, 500,
+                    new NodeConfig.Timeouts(500, 2_000, 3_000, 0));
             nodes.add(new Node(cfg));
         }
         for (Node n : nodes) n.start();

@@ -25,10 +25,12 @@ public record NodeConfig(
         double alpha,
         double beta,
         double rho,
-        long startDelayMs) {
+        long startDelayMs,
+        Timeouts timeouts) {
 
     public NodeConfig {
         if (tspFile != null && tspFile.isBlank()) tspFile = null; // TSP_FILE="" = não definido
+        if (timeouts == null) timeouts = Timeouts.defaults();
         require(nodeId > 0, "NODE_ID deve ser positivo (o Bully compara ids)");
         require(port > 0 && port <= 65_535, "NODE_PORT fora do intervalo 1–65535: " + port);
         require(!peers.containsKey(nodeId), "PEERS não pode conter o próprio nó (N" + nodeId + ")");
@@ -57,7 +59,30 @@ public record NodeConfig(
                 parse("ALPHA", env("ALPHA", "1.0"), Double::parseDouble),
                 parse("BETA", env("BETA", "3.0"), Double::parseDouble),
                 parse("RHO", env("RHO", "0.1"), Double::parseDouble),
-                parse("START_DELAY_MS", env("START_DELAY_MS", "5000"), Long::parseLong));
+                parse("START_DELAY_MS", env("START_DELAY_MS", "5000"), Long::parseLong),
+                new Timeouts(
+                        parse("RPC_TIMEOUT_MS", env("RPC_TIMEOUT_MS", "500"), Long::parseLong),
+                        parse("BROADCAST_TIMEOUT_MS", env("BROADCAST_TIMEOUT_MS", "2000"), Long::parseLong),
+                        parse("COORDINATOR_TIMEOUT_MS", env("COORDINATOR_TIMEOUT_MS", "3000"), Long::parseLong),
+                        parse("PEER_WAIT_MS", env("PEER_WAIT_MS", "0"), Long::parseLong)));
+    }
+
+    /**
+     * Tempos de rede. Os padrões são folgados em loopback/compose e apertados em LAN
+     * (Wi-Fi, roteador): ao rodar em máquinas físicas, aumente estes valores.
+     * Ver {@code docs/LAN.md}.
+     */
+    public record Timeouts(long rpcMs, long broadcastMs, long electionMs, long peerWaitMs) {
+        public Timeouts {
+            require(rpcMs > 0, "RPC_TIMEOUT_MS deve ser > 0");
+            require(broadcastMs > 0, "BROADCAST_TIMEOUT_MS deve ser > 0");
+            require(electionMs > 0, "COORDINATOR_TIMEOUT_MS deve ser > 0");
+            require(peerWaitMs >= 0, "PEER_WAIT_MS deve ser >= 0");
+        }
+
+        public static Timeouts defaults() {
+            return new Timeouts(500, 2_000, 3_000, 0);
+        }
     }
 
     /** Formato: "2=host2:50051,3=host3:50051" (id=host:porta). */
