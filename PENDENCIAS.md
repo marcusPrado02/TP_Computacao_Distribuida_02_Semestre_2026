@@ -5,12 +5,12 @@
 > O plano por pessoa continua em [`TODO.md`](TODO.md); o roteiro do ensaio físico, em
 > [`docs/LAN.md`](docs/LAN.md).
 
-**Resumo:** 1 bloqueador (1.1), 1 ensaio recomendado (1.2), 4 ajustes de demo/parâmetros,
-7 itens de relatório. Nada de Entrega 2 começa antes disso.
+**Resumo:** 0 bloqueadores (1.1 concluído em `3290e09`), 1 ensaio recomendado (1.2), 4 ajustes de
+demo/parâmetros, 7 itens de relatório. Nada de Entrega 2 começa antes disso.
 
 | # | Item | Dono (TODO.md) | Bloqueia a entrega? |
 |---|---|---|---|
-| 1.1 | Reconciliar `main` com `entrega1/validacoes` | A (todos revisam) | **Sim** |
+| 1.1 | Reconciliar `main` com `entrega1/validacoes` | A (todos revisam) | **Feito** (`3290e09`) |
 | 1.2 | Ensaio mínimo em **2** máquinas | A | Não — recomendado |
 | 2.1 | Rodada de ~1 s | B | Não (mas a demo fica ruim) |
 | 2.2 | `berlin52.tsp` via `TSP_FILE` | B | Não |
@@ -22,13 +22,15 @@
 
 - Núcleo distribuído: gRPC + streaming de feromônio, eleição Bully com detector de líder,
   relógio de Lamport, Ricart-Agrawala, formigas/rodadas, réplica da matriz de feromônio.
-- **28 testes verdes** em 8 classes no último build registrado (`target/surefire-reports`,
-  27/10 23:35): `RicartAgrawalaTest` (8), `RicartAgrawalaSafetyTest` (1), `NodeConfigTest` (6),
-  `PheromoneMatrixTest` (4), `BullyElectionTest` (3), `ClusterIntegrationTest` (3),
-  `LamportClockTest` (2), `AntColonyTest` (1).
+- **40 testes verdes** em 11 classes (`mvn test` no container, 28/10): `RicartAgrawalaTest` (11),
+  `RicartAgrawalaSafetyTest` (1), `NodeConfigTest` (6), `TspInstanceTest` (6), `PheromoneMatrixTest` (4),
+  `ClusterIntegrationTest` (4), `BullyElectionTest` (3), `LamportClockTest` (2), `AntColonyTest` (1),
+  `RoundWorkerTest` (1), `HandshakeTest` (1).
 - Ensaio local que imita LAN: `docker-compose.lan.yml` (IPs fixos), timeouts por env,
   barreira `PEER_WAIT_MS`, broadcast que pula peer morto.
-- Docs: `docs/ARQUITETURA.md` (com limitações conhecidas §6), `docs/LAN.md`, `README.md`.
+- Handshake de configuração no startup (token, remetente e conjunto `{self} ∪ PEERS`).
+- Docs: `docs/ARQUITETURA.md` (com limitações conhecidas §6), `docs/LAN.md`, `docs/AUDITORIA.md`,
+  `docs/ENUNCIADO.md`, `README.md`.
 
 > Sem `mvn`/`java` no `PATH` desta máquina? Rode a suíte dentro da imagem de build:
 > ```bash
@@ -39,7 +41,8 @@
 
 ### 1.1 Reconciliar `main` com `origin/entrega1/validacoes`
 
-- [ ] **Fazer o merge e resolver os conflitos.**
+- [x] **Feito em `3290e09`** (merge `--no-ff` com os 3 conflitos resolvidos; suíte de 40 testes verde;
+  compose LAN com 4 nós, barreira e failover N4 → N3 em ~7,5 s).
 
 Três commits de 20/10 (`e46a3a0`, `8f3ba03`, `ee09e5d`) **nunca entraram na `main`**. Eles contêm
 trabalho que a entrega usa: parser TSPLIB em `TspInstance`, validação de token/membros no startup
@@ -47,7 +50,7 @@ trabalho que a entrega usa: parser TSPLIB em `TspInstance`, validação de token
 (`TspInstanceTest`, `RoundWorkerTest`). A `main` seguiu por outro caminho (`7d87660` da PR #2 →
 `176620a`), então **as duas linhas divergiram** a partir de `ceea7b3`.
 
-O merge conflita em 3 arquivos (confirmado com `git merge-tree --write-tree`):
+O merge conflitava em 3 arquivos:
 
 ```
 CONFLICT (content): docs/ARQUITETURA.md
@@ -55,18 +58,14 @@ CONFLICT (content): src/main/java/br/pucminas/cd/aco/Node.java
 CONFLICT (content): src/main/java/br/pucminas/cd/aco/rpc/PeerNetwork.java
 ```
 
-```bash
-git fetch origin
-git switch main
-git merge --no-ff origin/entrega1/validacoes
-# resolver os conflitos preservando o endurecimento de LAN do 176620a
-```
-
-**Pronto quando:**
-- `mvn -q test` verde (esperado: > 28 testes, com `TspInstanceTest`, `RoundWorkerTest`, `HandshakeTest`);
-- `docker compose -f docker-compose.lan.yml up --build` sobe 4 nós, elege líder e completa rodadas;
-- nenhum lado perdeu feature: checar que continuam existindo os timeouts por env, a barreira
-  `PEER_WAIT_MS`, o skip de peer morto **e** a validação de token no startup.
+Como ficou resolvido (para quem for revisar):
+- `PeerNetwork`: timeouts configuráveis + handshake/quarentena/64 MiB; **heartbeat =
+  `max(1 s, RPC_TIMEOUT_MS)`**, mantendo o piso de 1 s e acompanhando a LAN.
+- `broadcastPheromone`: filtro `id == coordinator || shouldContact(id)` — o coordenador é sempre
+  tentado, os mortos ficam em quarentena.
+- `Node`: `PeerNetwork` com timeouts + `setConfigErrorHandler`; `BullyElection` com `electionMs`;
+  `RoundWorker` sem `leaderId`.
+- `RoundWorkerTest`/`HandshakeTest`: `NodeConfig` agora tem o 14º componente `Timeouts`.
 
 > Risco: os dois lados mexeram em `Node`, `PeerNetwork` e eleição. Conflito resolvido "no braço"
 > compila e ainda quebra o handshake em runtime — por isso o critério é teste de integração, não build.
@@ -78,8 +77,8 @@ git merge --no-ff origin/entrega1/validacoes
 O enunciado (`docs/ENUNCIADO.md` §3.1) pede que o sistema "possa ser executado em máquinas
 conectadas a uma rede local" — é requisito de **capacidade**, não de evidência. A Entrega 1 é só o
 relatório de 4 páginas; a demonstração ao vivo é da **Entrega 2**. Então o ensaio físico **não
-bloqueia** esta entrega, e a validação já registrada em Docker é forte (`docs/AUDITORIA.md`, que entra
-com o merge de 1.1: 38 testes, 4 nós no compose, 4000 rodadas, falha de líder e de seguidor).
+bloqueia** esta entrega, e a validação já registrada em Docker é forte (`docs/AUDITORIA.md`: 38 testes
+na época, hoje 40; 4 nós no compose, 4000 rodadas, falha de líder e de seguidor).
 
 Ainda assim vale ~30 minutos: fecha a ressalva anotada no topo de `docs/LAN.md` ("a evidência que
 conta é o cluster rodando em máquinas diferentes") e protege contra a pergunta "isso só roda em
@@ -193,12 +192,12 @@ mesmo tempo?".
 
 ## 4. Higiene da entrega
 
-- [ ] **Push da `main`:** hoje ela está **1 commit à frente de `origin/main`** (`176620a` não foi enviado).
+- [ ] **Push da `main`:** ela está **8 commits à frente de `origin/main`** (LAN + `entrega1/validacoes` +
+  `entrega1/pendencias` + os 2 merges). Os branches já foram mesclados e podem ser apagados depois.
   ```bash
   git push origin main
   ```
-- [ ] Abrir PR do branch de trabalho (se a disciplina exigir) e conferir que o merge não deixou
-  commit órfão do `entrega1/validacoes`.
+- [x] Merge de `entrega1/validacoes` (`3290e09`) e de `entrega1/pendencias` (`56e5955`) na `main`.
 - [ ] Confirmar **mesmo commit** em todas as máquinas do ensaio (`git rev-parse --short HEAD`).
 - [ ] `git status` limpo em cada máquina; `dependency-reduced-pom.xml` e `target/` já estão ignorados.
 - [ ] Anotar versões usadas no relatório: `java -version`, `docker --version`, `docker compose version`.
