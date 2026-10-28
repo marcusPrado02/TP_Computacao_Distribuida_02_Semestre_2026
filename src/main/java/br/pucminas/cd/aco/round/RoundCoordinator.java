@@ -20,9 +20,19 @@ import java.util.function.BooleanSupplier;
 /**
  * Papel de líder: dispara rodadas (StartRound), espera os RoundDone dos nós vivos
  * e acompanha a melhor rota global. Só roda enquanto este nó for o líder eleito.
+ *
+ * <p>As rodadas são síncronas (barreira): a rodada k+1 só começa quando todos os participantes
+ * vivos terminaram a k. Assim todos usam a mesma "geração" de feromônio, como no ACO sequencial.
+ * Um participante que cai deixa de ser esperado; se ninguém responde, o timeout encerra a rodada.
+ *
+ * <p>Thread-safety: o laço roda numa thread dedicada; {@link #onRoundDone} chega pelos handlers gRPC
+ * (e pelo trabalhador local) e acorda a espera pelo monitor de {@code this}. {@code done} é
+ * concorrente porque é escrito pelos handlers e lido pelo laço.
  */
 public final class RoundCoordinator implements RoundSink, AutoCloseable {
+    /** Tempo máximo de uma rodada; protege o líder de esperar para sempre por um nó travado. */
     private static final long ROUND_TIMEOUT_MS = 30_000;
+    /** Intervalo para reavaliar quem está vivo durante a espera (a queda não gera notificação). */
     private static final long POLL_MS = 500;
 
     private final NodeConfig cfg;
@@ -32,6 +42,7 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean finished = new AtomicBoolean(false);
+    /** rodada -&gt; ids dos nós que já enviaram RoundDone. */
     private final Map<Integer, Set<Integer>> done = new ConcurrentHashMap<>();
     private RoundWorker worker;
 
@@ -42,7 +53,7 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
         this.isLeader = isLeader;
     }
 
-    /** Liga o trabalhador local (dependência circular líder <-> trabalhador no mesmo nó). */
+    /** Liga o trabalhador local (dependência circular líder &lt;-&gt; trabalhador no mesmo nó). */
     public void attach(RoundWorker worker) {
         this.worker = worker;
     }
@@ -54,6 +65,7 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
         }
     }
 
+    /** Laço do líder: dispara rodadas até acabar ou perder a liderança. */
     private void loop() {
         try {
             Thread.sleep(cfg.startDelayMs()); // dá tempo dos peers subirem / eleição estabilizar

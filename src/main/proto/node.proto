@@ -8,19 +8,31 @@ option java_outer_classname = "NodeProto";
 
 // Serviço único exposto por todos os nós (os nós são simétricos:
 // qualquer um pode ser eleito líder).
+//
+// Todas as chamadas são unárias, com deadline no cliente e autenticadas pelo
+// header "x-cluster-token". Toda resposta também carrega Header, para o
+// cliente aplicar a regra de recebimento do relógio de Lamport.
 service NodeService {
   // --- Eleição de líder (Bully) ---
+  // Candidato -> nós de id maior, ao iniciar uma eleição. ok=true: "estou vivo, deixa comigo".
   rpc Election(ElectionMsg) returns (ElectionReply);
+  // Novo líder -> todos, ao vencer a eleição.
   rpc Coordinator(CoordinatorMsg) returns (Ack);
+  // Seguidor -> líder, a cada 1 s (detector de falha). Só o Ack importa.
   rpc Heartbeat(HeartbeatMsg) returns (Ack);
 
   // --- Exclusão mútua (Ricart-Agrawala) ---
+  // Nó que quer a seção crítica -> todos os vivos. O Ack só confirma a entrega, não é permissão.
   rpc RequestCS(CsRequest) returns (Ack);
+  // Nó -> solicitante: a permissão, enviada na hora ou adiada até sair da seção crítica.
   rpc ReplyCS(CsReply) returns (Ack);
 
   // --- Rodadas do ACO ---
+  // Líder -> todos, no início de cada rodada.
   rpc StartRound(RoundStart) returns (Ack);
+  // Cada nó -> líder, depois de atualizar o feromônio na seção crítica.
   rpc RoundDone(RoundResult) returns (Ack);
+  // Dono da seção crítica -> todos, antes de liberá-la: nova matriz completa.
   rpc UpdatePheromone(PheromoneUpdate) returns (Ack);
 }
 
@@ -30,6 +42,7 @@ message Header {
   int64 lamport = 2;
 }
 
+// Resposta genérica: confirma a entrega e devolve o relógio do receptor.
 message Ack {
   Header header = 1;
 }
@@ -70,6 +83,7 @@ message CsReply {
   int64 request_ts = 2;
 }
 
+// round começa em 1 e cresce de 1 em 1; um novo líder continua da última vista.
 message RoundStart {
   Header header = 1;
   int32 round = 2;

@@ -14,7 +14,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Papel de trabalhador (todo nó, inclusive o líder). A cada rodada:
- * formigas locais -> seção crítica (atualiza + propaga feromônio) -> avisa quem iniciou a rodada.
+ * formigas locais, depois seção crítica (atualiza + propaga feromônio), depois avisa quem iniciou
+ * a rodada (<code>coordinator</code>).
+ *
+ * <p>A parte cara (formigas) roda em paralelo em todos os nós e fora da seção crítica; só a escrita
+ * na matriz global é serializada. É isso que torna a distribuição vantajosa.
+ *
+ * <p>Thread-safety: as rodadas executam numa única thread ({@code executor}), uma de cada vez e na
+ * ordem de chegada. {@link #onStartRound} e {@link #onPheromoneUpdate} são chamados pelos handlers
+ * gRPC e só enfileiram trabalho ou mexem em objetos thread-safe.
  */
 public final class RoundWorker implements AutoCloseable {
     private final NodeConfig cfg;
@@ -69,6 +77,8 @@ public final class RoundWorker implements AutoCloseable {
 
     private void runRound(int round, int coordinator) {
         try {
+            // Semente distinta por (nó, rodada): nós diferentes exploram rotas diferentes,
+            // e a mesma configuração reproduz a mesma execução.
             long seed = cfg.tspSeed() * 1_000_003L + round * 101L + cfg.nodeId();
             Tour local = colony.runAnts(pheromone.snapshot(), cfg.ants(), seed);
             Log.info("Rodada %d: melhor local = %.0f", round, local.length());
@@ -81,8 +91,10 @@ public final class RoundWorker implements AutoCloseable {
                 // Síncrono: só libera depois que todos confirmarem a nova matriz.
                 network.broadcastPheromone(round, pheromone.flatten(), best.get(), coordinator);
             } finally {
-                mutex.release();
+                // Loga antes de liberar: depois do release() outro nó pode entrar e logar ENTROU,
+                // e os logs mostrariam uma sobreposição que não existiu.
                 Log.info("Rodada %d: SAIU da seção crítica", round);
+                mutex.release();
             }
             reportDone(round, local, coordinator);
         } catch (InterruptedException e) {
@@ -92,6 +104,7 @@ public final class RoundWorker implements AutoCloseable {
         }
     }
 
+    /** Avisa quem iniciou a rodada; se for este nó, entrega direto ao coordenador local. */
     private void reportDone(int round, Tour local, int coordinator) {
         // Rodada repetida pode chegar sem nenhuma rota conhecida (nó reiniciado): manda vazio.
         Tour result = local != null ? local : new Tour(new int[0], 0);

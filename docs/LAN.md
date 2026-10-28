@@ -24,11 +24,11 @@ O que deve aparecer (prova de que a rede e a barreira funcionam):
 [N4] LÍDER: iniciando rodada 1/30 com nós [1, 2, 3, 4]
 ```
 
-Failover no ensaio (dura ~5 s: 3 heartbeats de 1 s + eleição):
+Failover no ensaio (dura ~7,5 s: 5 heartbeats de 1,5 s + eleição):
 
 ```bash
 docker compose -f docker-compose.lan.yml stop node4
-# esperado: "Líder N4 não responde há 3 heartbeats" e "Novo líder: N3" em N1/N2/N3,
+# esperado: "Líder N4 não responde há 5 heartbeats" e "Novo líder: N3" em N1/N2/N3,
 # depois "LÍDER: iniciando rodada N/30 com nós [1, 2, 3]"
 docker compose -f docker-compose.lan.yml down
 ```
@@ -94,7 +94,7 @@ um heartbeat antes da **primeira** rodada (`LÍDER: aguardando peers [...] subir
 - Log das 4 máquinas com `Novo líder: N4` no mesmo intervalo de tempo.
 - `LÍDER: todos os 3 peers responderam; iniciando as rodadas` (barreira).
 - Rodadas concluídas: `LÍDER: rodada 30 concluída; melhor global = ...` e `FIM: melhor rota = ...`.
-- Failover real: `Ctrl+C`/desligar a máquina do líder → `Líder N4 não responde há 3 heartbeats`
+- Failover real: `Ctrl+C`/desligar a máquina do líder → `Líder N4 não responde há 5 heartbeats`
   → `Novo líder: N3` nas três sobreviventes.
 - Print dos relógios de Lamport crescendo nos logs (`[L=...]`).
 

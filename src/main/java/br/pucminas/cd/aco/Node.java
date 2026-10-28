@@ -33,6 +33,10 @@ import java.util.concurrent.TimeUnit;
  * <p>Todos os nós são iguais; o papel de líder é decidido em tempo de execução pelo Bully.
  * Ciclo de vida: {@link #start()} sobe o servidor gRPC, o monitor de líder e a primeira eleição;
  * {@link #close()} derruba tudo na ordem inversa.
+ *
+ * <p>Fiação principal: {@code PeerNetwork} implementa os transportes do Bully e do Ricart-Agrawala;
+ * {@code NodeServiceImpl} recebe as mensagens e as entrega aos mesmos módulos; quando o Bully elege
+ * este nó, o {@code RoundCoordinator} começa a disparar rodadas.
  */
 public final class Node implements AutoCloseable {
     /** Janela do handshake de startup; cobre peers que ainda estão subindo. */
@@ -51,6 +55,11 @@ public final class Node implements AutoCloseable {
     private final Server server;
     private volatile boolean closed;
 
+    /**
+     * Monta o nó sem abrir porta nem falar com ninguém.
+     *
+     * @throws IOException se o arquivo TSPLIB configurado não puder ser lido
+     */
     public Node(NodeConfig cfg) throws IOException {
         this.cfg = cfg;
         LamportClock clock = new LamportClock();
@@ -167,10 +176,12 @@ public final class Node implements AutoCloseable {
 
     // ------------------------------------------------------------- Observação (demo e testes)
 
+    /** Id deste nó. */
     public int id() {
         return cfg.nodeId();
     }
 
+    /** Líder conhecido por este nó, ou -1. */
     public int leaderId() {
         return election.leaderId();
     }

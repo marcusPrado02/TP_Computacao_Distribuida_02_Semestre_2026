@@ -17,8 +17,18 @@ import java.util.function.IntConsumer;
  *   <li>Se ninguém responde OK, ele se declara líder e envia COORDINATOR a todos.</li>
  *   <li>Se alguém responde OK, espera o COORDINATOR; se não chegar, recomeça.</li>
  * </ol>
+ *
+ * <p>Quem recebe ELECTION de um id menor responde OK e inicia a própria eleição: assim a
+ * candidatura "sobe" até o maior nó vivo. O nome vem daí: o maior sempre "intimida" os menores.
+ * Pressupõe ids únicos e um detector de falha por timeout (deadline das chamadas gRPC).
+ *
+ * <p>Thread-safety: a eleição roda numa virtual thread própria ({@link #startElection}); os handlers
+ * gRPC chamam {@link #onElection} e {@link #onCoordinator} de outras threads. {@code electing} garante
+ * no máximo uma eleição por vez; {@code lock} protege {@code coordinatorSeen} e serve de monitor
+ * para a espera do COORDINATOR; {@code leaderId} é atômico.
  */
 public final class BullyElection implements AutoCloseable {
+    /** Quanto esperar o COORDINATOR depois de receber um OK antes de recomeçar a eleição. */
     static final long DEFAULT_COORDINATOR_TIMEOUT_MS = 3_000;
 
     private final int selfId;
@@ -43,6 +53,7 @@ public final class BullyElection implements AutoCloseable {
         this.coordinatorTimeoutMs = coordinatorTimeoutMs;
     }
 
+    /** Registra quem deve ser avisado (com o id do novo líder) sempre que o líder mudar. */
     public void onLeaderChange(IntConsumer listener) {
         listeners.add(listener);
     }
@@ -52,6 +63,7 @@ public final class BullyElection implements AutoCloseable {
         return leaderId.get();
     }
 
+    /** true se este nó é o líder atual. */
     public boolean isLeader() {
         return leaderId.get() == selfId;
     }

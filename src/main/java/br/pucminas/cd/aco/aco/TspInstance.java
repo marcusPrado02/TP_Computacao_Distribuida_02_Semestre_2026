@@ -7,7 +7,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-/** Instância do TSP simétrico euclidiano (distâncias arredondadas como no TSPLIB EUC_2D). */
+/**
+ * Instância do TSP simétrico euclidiano (distâncias arredondadas como no TSPLIB EUC_2D).
+ *
+ * <p>Guarda a matriz de distâncias completa (n×n), calculada uma vez. Imutável e, portanto,
+ * segura para leitura concorrente pelas formigas. Todos os nós precisam construir a mesma
+ * instância (mesma semente ou mesmo arquivo), senão os índices das cidades não batem.
+ */
 public final class TspInstance {
     private final double[][] dist;
 
@@ -27,7 +33,10 @@ public final class TspInstance {
         return fromCoords(x, y);
     }
 
-    /** Lê arquivo TSPLIB com NODE_COORD_SECTION (ex.: berlin52.tsp). */
+    /**
+     * Lê arquivo TSPLIB com NODE_COORD_SECTION (ex.: berlin52.tsp).
+     * Cada linha da seção é "índice x y"; o índice do arquivo é ignorado e a ordem de leitura vale.
+     */
     public static TspInstance fromTsplib(Path file) throws IOException {
         List<double[]> coords = new ArrayList<>();
         boolean inCoords = false;
@@ -66,6 +75,7 @@ public final class TspInstance {
         return fromCoords(x, y);
     }
 
+    /** Constrói a matriz de distâncias a partir das coordenadas (x[i], y[i]). */
     public static TspInstance fromCoords(double[] x, double[] y) {
         if (x.length != y.length) {
             throw new IllegalArgumentException("x e y com tamanhos diferentes: " + x.length + " e " + y.length);
@@ -77,20 +87,24 @@ public final class TspInstance {
         double[][] dist = new double[n][n];
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
+                // EUC_2D do TSPLIB: distância euclidiana arredondada para inteiro (comparável à literatura)
                 dist[i][j] = Math.rint(Math.hypot(x[i] - x[j], y[i] - y[j]));
             }
         }
         return new TspInstance(dist);
     }
 
+    /** Número de cidades. */
     public int size() {
         return dist.length;
     }
 
+    /** Distância entre as cidades i e j. */
     public double distance(int i, int j) {
         return dist[i][j];
     }
 
+    /** Comprimento da rota fechada que visita {@code path} em ordem e volta ao início. */
     public double tourLength(int[] path) {
         double total = 0;
         for (int k = 0; k < path.length; k++) {

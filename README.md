@@ -5,6 +5,7 @@ Colônia de Formigas (ACO) resolvendo o Caixeiro-Viajante em vários nós Java q
 
 **Entrega 1:** gRPC · eleição de líder (Bully) · relógio lógico (Lamport) · exclusão mútua (Ricart-Agrawala).
 
+- **Documentação completa (comece aqui):** [`docs/README.md`](docs/README.md): roteiro de leitura, algoritmos explicados, referência das classes, testes e guia de demonstração
 - Arquitetura e decisões: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md)
 - Enunciado do trabalho: [`docs/ENUNCIADO.md`](docs/ENUNCIADO.md)
 - Plano e divisão de tarefas: [`TODO.md`](TODO.md)
@@ -15,13 +16,31 @@ Colônia de Formigas (ACO) resolvendo o Caixeiro-Viajante em vários nós Java q
 - Java 21 e Maven 3.9+ (para rodar sem Docker)
 - Docker + Docker Compose v2 (para rodar em contêineres)
 
+## Jeito rápido: `./tp`
+
+Script com as operações comuns (Linux, macOS, WSL ou Git Bash; precisa de Java 21 e Maven):
+
+```bash
+./tp                       # menu interativo (pergunta os parâmetros)
+./tp up -n 4 -r 30         # sobe 4 nós locais em background
+./tp status                # quem está vivo, líder visto, rodada e relógio de cada nó
+./tp kill 4                # derruba o líder (crash) para ver a reeleição
+./tp timeline cs           # seção crítica de todos os nós, em ordem de Lamport
+./tp check                 # verifica nos logs que nunca houve 2 nós na seção crítica
+./tp demo failover         # roteiro automático: elege, derruba o líder, mede a reeleição
+./tp down                  # derruba tudo
+./tp help                  # todos os comandos
+```
+
+Detalhes e roteiros de demonstração: [`docs/guia-de-execucao.md`](docs/guia-de-execucao.md).
+
 ## Build e testes (Docker)
 
 Tudo roda em containers; não é preciso ter Java/Maven instalado no host.
 
 ```bash
 docker build --target build -t aco-build .
-docker run --rm aco-build mvn -B test   # 38 testes (unitários + integração), ~10 s
+docker run --rm aco-build mvn -B test   # 40 testes (unitários + integração), ~10 s
 docker compose up --build               # cluster de 4 nós
 ```
 
