@@ -1,0 +1,33 @@
+\section{Requisitos Implementados}
+
+% FONTES: docs/ARQUITETURA.md §5 (5.1 gRPC, 5.2 Bully, 5.3 Lamport, 5.4 Ricart-Agrawala),
+%         docs/algoritmos/*.md (algoritmo + diagrama de sequencia de cada um),
+%         docs/classes/*.md (detalhe de implementacao por classe)
+% O enunciado pede NO MINIMO DOIS requisitos; aqui sao quatro. Cada subsecao deve caber em
+% ~1/3 de pagina: algoritmo, mensagens e UMA decisao de projeto.
+
+\subsection{RPC -- gRPC}
+% src/main/proto/node.proto, rpc/PeerNetwork.java, rpc/NodeServiceImpl.java, rpc/ClusterAuth.java
+\pendente{servi\c{c}o \'unico; deadlines; token no interceptor; 64 MiB}
+
+\subsection{Elei\c{c}\~ao de l\'ider -- Bully}
+% election/BullyElection.java, election/LeaderMonitor.java, docs/algoritmos/bully.md
+\pendente{3 passos; maior id; 5 heartbeats; contesta\c{c}\~ao de id menor; failover (Tabela 2)}
+
+\subsection{Rel\'ogio l\'ogico -- Lamport}
+% clock/LamportClock.java, docs/algoritmos/lamport.md
+\pendente{tick no envio, max+1 no recebimento; ordena pedidos e numera logs}
+
+\subsection{Exclus\~ao m\'utua -- Ricart-Agrawala}
+% mutex/RicartAgrawala.java, docs/algoritmos/ricart-agrawala.md
+\pendente{RELEASED/WANTED/HELD; prioridade (ts, id); REPLY carrega request\_ts; 2(N-1) mensagens;
+falha = permiss\~ao (risco assumido, vira desafio na se\c{c}\~ao 5)}
+
+\begin{figure}[t]
+  \centering
+  \scalebox{0.85}{\input{figuras/sequencia-ra}}
+  \caption{Ricart-Agrawala com tr\^es participantes: N1 s\'o entra na se\c{c}\~ao cr\'itica depois
+  de receber as duas permiss\~oes. O par $(ts, id)$ decide quem espera: um pedido mais novo pode
+  ser adiado e respondido s\'o na sa\'ida da se\c{c}\~ao cr\'itica.}
+  \label{fig:ra}
+\end{figure}

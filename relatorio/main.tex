@@ -1,0 +1,74 @@
+% Relatorio do Trabalho Pratico -- Computacao Distribuida (PUC Minas, 2026/2)
+%
+% ESTE ARQUIVO E UM ANDAIME: a estrutura, as figuras e a tabela estao prontas;
+% o texto de cada secao e escrito pelo grupo (o enunciado desconsidera texto
+% gerado automaticamente). Os marcadores \pendente{...} mostram o que falta.
+%
+% Limite da Entrega 1: 4 paginas. Limite da Entrega 2: 6 paginas.
+% Template: modelo de artigo da SBC (sbc-template.sty vendorizado nesta pasta).
+%
+% Compilar (nao precisa de TeX no host):
+%   docker run --rm -v "$PWD":/w -w /w texlive/texlive:latest \
+%     latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
+
+\documentclass[12pt]{article}
+
+\usepackage{sbc-template}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+\usepackage{needspace}
+
+% Marcador visivel de texto que ainda precisa ser escrito pelo grupo.
+% Troque para \pendentesfalse para ver o PDF sem os marcadores e medir o espaco livre
+% (foi assim que conferimos que ainda sobram ~1,5 pagina para a prosa).
+\newif\ifpendentes \pendentestrue
+\newcommand{\pendente}[1]{\ifpendentes\textcolor{red}{\textbf{[PENDENTE: #1]}}\fi}
+
+\sloppy
+
+\title{Col\^onia de Formigas Distribu\'ida para o Caixeiro-Viajante com Elei\c{c}\~ao de L\'ider, Rel\'ogio de Lamport e Exclus\~ao M\'utua}
+
+% R1: confirmar a lista completa de autores (TODO.md ainda tem "A = ____").
+\author{Pedro Vila\c{c}a\inst{1}, Marcus Prado Silva\inst{1}, \pendente{+ 2 autores}\inst{1}}
+
+\address{Instituto de Ci\^encias Exatas e Inform\'atica (ICEx) -- PUC Minas\\
+Belo Horizonte -- MG -- Brasil
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{resumo}
+% Regra do template: no maximo 10 linhas, na primeira pagina.
+\pendente{resumo em portugues, ate 10 linhas: problema, abordagem (ACO distribuido), requisitos
+implementados e resultado principal}
+\end{resumo}
+
+\begin{abstract}
+\pendente{abstract em ingles, ate 10 linhas: traducao do resumo}
+\end{abstract}
+
+\noindent\textbf{Palavras-chave:} \pendente{3 a 5 palavras-chave}
+
+\input{secoes/01-introducao}
+\input{secoes/02-arquitetura}
+\input{secoes/03-requisitos}
+\input{secoes/04-resultados}
+\input{secoes/05-desafios}
+\input{secoes/06-papeis}
+
+% Bibliografia manual (6 entradas) para compilar sem precisar do sbc.bst oficial.
+% Para usar BibTeX: baixe sbc.bst, troque este bloco por
+%   \bibliographystyle{sbc} \bibliography{referencias}
+\Needspace*{12\baselineskip} % nao deixa a lista de referencias quebrar entre paginas
+\input{secoes/07-referencias}
+
+\end{document}

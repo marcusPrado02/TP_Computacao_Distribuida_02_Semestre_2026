@@ -1,0 +1,12 @@
+\section{Desafios e Problemas Encontrados}
+
+% FONTE: docs/AUDITORIA.md (achados F1 a F13) e docs/ARQUITETURA.md §6.
+% Escolher 3 ou 4 e contar o que aconteceu de verdade -- nao listar todos.
+
+\pendente{lento n\~ao \'e morto: falha por timeout conta como permiss\~ao (F1)}
+
+\pendente{peer que morre depois do REQUEST: acquire() travava (F2/F3)}
+
+\pendente{matriz grande: limite de 4 MiB do gRPC (F8)}
+
+\pendente{configura\c{c}\~ao divergente = split-brain; handshake mata o processo (F9)}

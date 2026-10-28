@@ -178,15 +178,37 @@ mesmo tempo?".
 
 ## 3. Relatório (template SBC, até 4 páginas)
 
-- [ ] Problema escolhido e justificativa (ACO/TSP) — B
-- [ ] Arquitetura: entidades, quem fala com quem, mensagens gRPC — A
-- [ ] gRPC + streaming de feromônio — A
-- [ ] Bully + detector de falha (com o log do failover como figura) — C
-- [ ] Lamport + Ricart-Agrawala, e o argumento do `PheromoneMatrixTest` (sem SC as réplicas divergem) — D
-- [ ] Desafios encontrados (usar §6 de `docs/ARQUITETURA.md`: lento × morto, peer pulado, réplica sem versão)
-- [ ] Papel de cada aluno (e quem fez o quê no código — bater com `git shortlog -sn`)
-- [ ] Resultados: tabela do ensaio (2 máquinas + compose: nós, rodadas, tempo por rodada,
-  melhor rota, tempo de failover)
+**Andaime pronto em `relatorio/`** — compila para `relatorio/main.pdf` (4 páginas com os marcadores;
+~2,2 páginas sem eles, ou seja, sobram ~1,8 páginas para a prosa). Não precisa de TeX no host:
+
+```bash
+cd relatorio && docker run --rm -v "$PWD":/w -w /w texlive/texlive:latest \
+  latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
+```
+
+- [x] Template SBC vendorizado (`relatorio/sbc-template.sty`) + `main.tex` com a estrutura
+- [x] Título, autores (2 de 4+), resumo/abstract e palavras-chave como marcadores
+- [x] Figuras vetoriais em TikZ: arquitetura e sequência do Ricart-Agrawala (`relatorio/figuras/`)
+- [x] Tabela de mensagens (fato, extraído do `node.proto`) e tabela de resultados com os números medidos
+- [x] 6 referências no formato SBC (`secoes/07-referencias.tex` + `referencias.bib`)
+- [x] `docs/evidencias/README.md` com o que coletar e como nomear
+
+Pendente (o que ainda falta para a entrega):
+
+- [ ] **R1 — Nomes dos autores:** `TODO.md` linha 15 ainda está `A = ____`; hoje só 2 pessoas têm
+  commits (`git shortlog -sn`). Sem isso não existe "papel de cada aluno".
+- [ ] **R2 — Data e formato:** confirmar no Canvas o prazo e se é upload de PDF.
+- [ ] **R3 — Texto de cada seção**, uma pessoa por bloco (mapa no `relatorio/README.md`):
+  - [ ] Introdução: problema, ACO/TSP, 4 requisitos atendidos (o enunciado exige 2) — B
+  - [ ] Arquitetura: entidades, mensagens, uma rodada — A
+  - [ ] gRPC + 64 MiB + token — A
+  - [ ] Bully + detector (5 heartbeats) + failover — C
+  - [ ] Lamport + Ricart-Agrawala + `PheromoneMatrixTest` (sem SC as réplicas divergem) — D
+  - [ ] Desafios: usar F1/F2/F8/F9 de `docs/AUDITORIA.md` (lento × morto é o melhor argumento)
+- [ ] **R4 — Resultados:** confirmar a Tabela 2 com o ensaio de 2 máquinas (ver `docs/evidencias/`)
+  e escrever a análise; se o ensaio não for feito, remover a frase sobre máquinas físicas.
+- [ ] **R5 — Fechamento:** remover todos os marcadores (`grep -rn pendente relatorio/secoes/`),
+  conferir ≤4 páginas e revisar o texto (IA só para revisão).
 
 > Lembrete do enunciado: IA só para revisar/corrigir texto. Texto praticamente gerado por IA é desconsiderado.
 

@@ -1,0 +1,31 @@
+% Figura 1 -- entidades e principais mensagens (TikZ, vetorial; nao depende de PNG externo).
+% Uso: \input{figuras/arquitetura} dentro de um ambiente figure.
+\begin{tikzpicture}[
+    font=\footnotesize,
+    no/.style={draw, rounded corners=2pt, minimum width=1.45cm, minimum height=0.75cm, align=center},
+    lider/.style={no, fill=black!12, very thick},
+    seta/.style={-{Latex[length=1.7mm]}, semithick},
+    rot/.style={font=\scriptsize, inner sep=1.5pt}
+  ]
+
+  % Lider
+  \node[lider] (n4) at (1.55,2.15) {N4\\[-1pt]\scriptsize l\'ider};
+
+  % Trabalhadores
+  \node[no] (n1) at (0,0)   {N1};
+  \node[no] (n2) at (1.55,0) {N2};
+  \node[no] (n3) at (3.10,0) {N3};
+
+  % Lider -> nos (StartRound) e nos -> lider (RoundDone / Heartbeat)
+  \foreach \n in {n1,n2,n3} {
+      \draw[seta] (n4) to[bend left=10] (\n);
+      \draw[seta] (\n) to[bend left=10] (n4);
+    }
+
+  % Legenda (evita rotulos em cima das setas)
+  \draw[seta] (0.0,-1.20) -- ++(0.55,0) node[right,rot] {StartRound: l\'ider $\rightarrow$ n\'os};
+  \draw[seta] (0.0,-1.60) -- ++(0.55,0) node[right,rot] {RoundDone e Heartbeat: n\'o $\rightarrow$ l\'ider};
+  \draw[seta, dashed] (0.0,-2.00) -- ++(0.55,0) node[right,rot]
+    {UpdatePheromone: n\'o na se\c{c}\~ao cr\'itica $\rightarrow$ todos (matriz $n\times n$)};
+
+\end{tikzpicture}

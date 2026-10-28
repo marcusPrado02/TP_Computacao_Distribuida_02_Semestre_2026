@@ -21,6 +21,9 @@ relatorio/*.blg
 relatorio/*.log
 relatorio/*.out
 relatorio/*.synctex.gz
+relatorio/*.fls
+relatorio/*.fdb_latexmk
+relatorio/*.toc
 
 # Estado do cluster local (./tp)
 .run/

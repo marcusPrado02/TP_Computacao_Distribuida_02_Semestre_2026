@@ -1,0 +1,48 @@
+\section{Arquitetura do Sistema}
+
+% FONTES: docs/ARQUITETURA.md (secoes 1 a 4), docs/rede-grpc.md, docs/rodadas.md,
+%         docs/concorrencia.md, docs/LAN.md (implantacao)
+
+\pendente{vis\~ao geral: N n\'os sim\'etricos, mesmo bin\'ario, papel definido pela elei\c{c}\~ao}
+
+\begin{figure}[ht]
+  \centering
+  \scalebox{0.88}{\input{figuras/arquitetura}}
+  \caption{Entidades e mensagens. Todos os n\'os s\~ao trabalhadores; o l\'ider (maior id vivo)
+  coordena as rodadas. A matriz de ferom\^onio \'e replicada e s\'o muda dentro da se\c{c}\~ao
+  cr\'itica.}
+  \label{fig:arquitetura}
+\end{figure}
+
+\subsection{Entidades e pap\'eis}
+
+\pendente{l\'ider, trabalhador, detector de l\'ider e m\'odulos de suporte}
+
+\subsection{Mensagens}
+
+% Tabela factual extraida de src/main/proto/node.proto e de rpc/PeerNetwork.
+\begin{table}[ht]
+  \centering
+  \footnotesize
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Mensagem & Dire\c{c}\~ao & Papel \\
+    \midrule
+    \texttt{Heartbeat}            & n\'o $\to$ l\'ider       & detector de falha e handshake de configura\c{c}\~ao \\
+    \texttt{Election} / \texttt{Coordinator} & todos $\to$ todos & elei\c{c}\~ao (Bully) \\
+    \texttt{RequestCS} / \texttt{ReplyCS}    & n\'o $\leftrightarrow$ n\'o & Ricart-Agrawala (com \texttt{request\_ts}) \\
+    \texttt{StartRound}           & l\'ider $\to$ todos      & in\'icio de rodada \\
+    \texttt{RoundDone}            & n\'o $\to$ coordenador   & melhor rota local da rodada \\
+    \texttt{UpdatePheromone}      & n\'o $\to$ todos         & matriz $n\times n$ + melhor rota (s\'incrono) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Mensagens do servi\c{c}o \texttt{NodeService} (gRPC). Toda mensagem carrega
+  \texttt{sender\_id} e um carimbo de Lamport no cabe\c{c}alho, al\'em do token do cluster.}
+  \label{tab:mensagens}
+\end{table}
+
+\pendente{por que um servi\c{c}o \'unico e o que vai no cabe\c{c}alho}
+
+\subsection{Uma rodada}
+
+\pendente{formigas $\to$ se\c{c}\~ao cr\'itica (atualiza + propaga) $\to$ RoundDone; o que roda fora da SC}

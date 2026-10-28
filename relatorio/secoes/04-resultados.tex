@@ -1,0 +1,29 @@
+\section{Resultados}
+
+% FONTES dos numeros: docs/AUDITORIA.md (execucao de 20/10) e o ensaio de compose LAN de 28/10
+% (4 nos, 60 cidades, 40 formigas, seed 42). R5: arquivar os logs em docs/evidencias/ e
+% confirmar estes numeros com o ensaio de 2 maquinas fisicas.
+
+\begin{table}[t]
+  \centering
+  \footnotesize
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    Medida & Valor observado \\
+    \midrule
+    Testes automatizados (unit\'arios + integra\c{c}\~ao) & 40, todos passando \\
+    Rodadas de 30 (60 cidades, 40 formigas por n\'o)      & $\approx$1,5 s no total ($\approx$50 ms/rodada) \\
+    Melhor rota encontrada (seed 42)                       & 6067 \\
+    Failover do l\'ider (4 n\'os, configura\c{c}\~ao LAN)  & $\approx$7,5 s (5 heartbeats de 1,5 s + elei\c{c}\~ao) \\
+    Estabilidade em execu\c{c}\~ao longa                   & 4000 rodadas sem timeout \\
+    Queda de seguidor no meio da execu\c{c}\~ao            & sobreviventes conclu\'iram as 600 rodadas \\
+    \bottomrule
+  \end{tabular}
+  \caption{Medidas do sistema. A linha de tempo por rodada foi obtida em uma \'unica m\'aquina
+  (4 cont\^eineres); os n\'umeros de execu\c{c}\~oes longas v\^em da auditoria de 20/10.}
+  \label{tab:resultados}
+\end{table}
+
+\pendente{o que a tabela mostra: r\'eplicas convergem, custo de rede por rodada, tempo de detec\c{c}\~ao}
+
+\pendente{ensaio em 2 m\'aquinas f\'isicas (se j\'a feito; sen\~ao remover esta frase)}
