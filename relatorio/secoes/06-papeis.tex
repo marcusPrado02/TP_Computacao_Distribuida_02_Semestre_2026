@@ -1,24 +1,27 @@
 \section{Papel de Cada Aluno}
 
-% R1: preencher os nomes. O TODO.md ainda tem "A = ____". Ajuda:
-%   git shortlog -sn --all   (quem commitou o que)
-%   docs/ARQUITETURA.md §1   (divisao por modulo)
 % O enunciado exige que cada aluno saiba explicar a propria parte na arg\^uicao.
+% Preenchido com o que o historico do git comprova; o resto precisa ser confirmado pelo grupo:
+%   A = gRPC, infraestrutura, Docker, LAN      B = ACO/TSP e rodadas
+%   C = eleicao de lider + detector            D = Lamport + Ricart-Agrawala
+% Ajuda: git shortlog -sn --all  e  git log --author="nome" --stat
 
 \begin{table}[ht]
   \centering
   \footnotesize
-  \begin{tabular}{@{}p{3.1cm}p{4.2cm}p{5.2cm}@{}}
+  \begin{tabular}{@{}p{4.4cm}p{3.9cm}p{5.7cm}@{}}
     \toprule
     Aluno & M\'odulo & O que fez \\
     \midrule
-    \pendente{nome} & gRPC, Docker, LAN & \pendente{2 a 3 itens} \\
-    \pendente{nome} & ACO/TSP e rodadas & \pendente{2 a 3 itens} \\
-    \pendente{nome} & Elei\c{c}\~ao + detector & \pendente{2 a 3 itens} \\
-    \pendente{nome} & Lamport + Ricart-Agrawala & \pendente{2 a 3 itens} \\
+    Pedro Henrique Vila\c{c}a Valverde & gRPC, Docker, LAN &
+      IPs fixos e timeouts de LAN, handshake de token, TSPLIB \\
+    Marcus Prado Silva & Ricart-Agrawala + documenta\c{c}\~ao &
+      implementa\c{c}\~ao e testes de integra\c{c}\~ao, docs por classe/algoritmo, script \texttt{tp} \\
+    Gabriel Batista de Almeida & \pendente{m\'odulo} & \pendente{2 a 3 itens} \\
+    Eduardo Alves Salgado Lisboa Oliveira & \pendente{m\'odulo} & \pendente{2 a 3 itens} \\
     \bottomrule
   \end{tabular}
   \caption{Divis\~ao de trabalho. Descrever o que a pessoa realmente fez (projetou, implementou,
-  testou, corrigiu), n\~ao apenas o m\'odulo.}
+  testou, corrigiu, escreveu), n\~ao apenas o m\'odulo.}
   \label{tab:papeis}
 \end{table}

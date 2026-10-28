@@ -195,8 +195,12 @@ cd relatorio && docker run --rm -v "$PWD":/w -w /w texlive/texlive:latest \
 
 Pendente (o que ainda falta para a entrega):
 
-- [ ] **R1 — Nomes dos autores:** `TODO.md` linha 15 ainda está `A = ____`; hoje só 2 pessoas têm
-  commits (`git shortlog -sn`). Sem isso não existe "papel de cada aluno".
+- [x] **R1 — Autores:** Pedro Henrique Vila\c{c}a Valverde, Marcus Prado Silva,
+  Gabriel Batista de Almeida e Eduardo Alves Salgado Lisboa Oliveira (4, dentro do 4–5 do enunciado).
+  O `main.tex` e a Tabela 3 já têm os nomes.
+- [ ] **R1b — Módulo de Gabriel e Eduardo:** a Tabela 3 só tem o "o que fez" de Pedro (LAN/infra,
+  handshake, TSPLIB) e Marcus (Ricart-Agrawala, testes, docs), porque é o que o git comprova.
+  Confirmar quem ficou com B (ACO/rodadas) e C (Bully/detector) e preencher as duas linhas.
 - [ ] **R2 — Data e formato:** confirmar no Canvas o prazo e se é upload de PDF.
 - [ ] **R3 — Texto de cada seção**, uma pessoa por bloco (mapa no `relatorio/README.md`):
   - [ ] Introdução: problema, ACO/TSP, 4 requisitos atendidos (o enunciado exige 2) — B
