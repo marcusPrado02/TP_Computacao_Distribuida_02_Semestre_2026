@@ -1,17 +1,17 @@
 # Pendências — Entrega 1
 
-> Fotografia de **27/10/2026**, a partir do commit `176620a` (*Endurece o cluster para LAN…*).
+> Fotografia de **28/10/2026**, a partir do commit `176620a` (*Endurece o cluster para LAN…*).
 > Este arquivo é a **lista de ação** (o que fazer, como verificar, quando está pronto).
 > O plano por pessoa continua em [`TODO.md`](TODO.md); o roteiro do ensaio físico, em
 > [`docs/LAN.md`](docs/LAN.md).
 
-**Resumo:** 2 bloqueadores (1.1 e 1.2), 4 ajustes de demo/parâmetros, 5 itens de relatório.
-Nada de Entrega 2 começa antes disso.
+**Resumo:** 1 bloqueador (1.1), 1 ensaio recomendado (1.2), 4 ajustes de demo/parâmetros,
+7 itens de relatório. Nada de Entrega 2 começa antes disso.
 
 | # | Item | Dono (TODO.md) | Bloqueia a entrega? |
 |---|---|---|---|
 | 1.1 | Reconciliar `main` com `entrega1/validacoes` | A (todos revisam) | **Sim** |
-| 1.2 | Cluster real em 4 máquinas + evidências | A | **Sim** |
+| 1.2 | Ensaio mínimo em **2** máquinas | A | Não — recomendado |
 | 2.1 | Rodada de ~1 s | B | Não (mas a demo fica ruim) |
 | 2.2 | `berlin52.tsp` via `TSP_FILE` | B | Não |
 | 2.3 | Roteiro de failover | C | Não |
@@ -35,7 +35,7 @@ Nada de Entrega 2 começa antes disso.
 > docker run --rm -v "$PWD":/app -w /app maven:3.9.9-eclipse-temurin-21 mvn -q -B test
 > ```
 
-## 1. Bloqueadores
+## 1. Antes da entrega
 
 ### 1.1 Reconciliar `main` com `origin/entrega1/validacoes`
 
@@ -71,34 +71,53 @@ git merge --no-ff origin/entrega1/validacoes
 > Risco: os dois lados mexeram em `Node`, `PeerNetwork` e eleição. Conflito resolvido "no braço"
 > compila e ainda quebra o handshake em runtime — por isso o critério é teste de integração, não build.
 
-### 1.2 Teste real: 4 máquinas físicas + evidências
+### 1.2 Ensaio mínimo em 2 máquinas (recomendado, não bloqueia)
 
-- [ ] **Fazer o ensaio e arquivar as provas.**
+- [ ] **Rodar uma vez em 2 notebooks e guardar a prova.**
 
-Roteiro completo (pré-requisitos, comandos, tabela de IPs): [`docs/LAN.md`](docs/LAN.md) §2.
-O ensaio em `docker-compose.lan.yml` **não substitui** este item — o enunciado exige nós físicos.
+O enunciado (`docs/ENUNCIADO.md` §3.1) pede que o sistema "possa ser executado em máquinas
+conectadas a uma rede local" — é requisito de **capacidade**, não de evidência. A Entrega 1 é só o
+relatório de 4 páginas; a demonstração ao vivo é da **Entrega 2**. Então o ensaio físico **não
+bloqueia** esta entrega, e a validação já registrada em Docker é forte (`docs/AUDITORIA.md`, que entra
+com o merge de 1.1: 38 testes, 4 nós no compose, 4000 rodadas, falha de líder e de seguidor).
 
-Preencher antes de subir (mesmo commit em todas as máquinas):
+Ainda assim vale ~30 minutos: fecha a ressalva anotada no topo de `docs/LAN.md` ("a evidência que
+conta é o cluster rodando em máquinas diferentes") e protege contra a pergunta "isso só roda em
+Docker?" na arguição. **Duas máquinas bastam** — não precisa mobilizar 4 pessoas para a Entrega 1.
 
-| Máquina | IP (`hostname -I`) | `NODE_ID` | Quem |
+Mesmo commit nas duas, porta 50051 liberada, mesma rede, mesmo `CLUSTER_TOKEN`
+(roteiro completo: [`docs/LAN.md`](docs/LAN.md) §2).
+
+| Máquina | IP (`hostname -I`) | `NODE_ID` | `PEERS` |
 |---|---|---|---|
-| A | | 1 | |
-| B | | 2 | |
-| C | | 3 | |
-| D | | 4 | |
+| notebook A | | 1 | `2=<IP-do-B>:50051` |
+| notebook B | | 2 | `1=<IP-do-A>:50051` |
 
-Evidências a salvar em `docs/evidencias/` (prints ou `.log`):
+```bash
+export CLUSTER_TOKEN='<igual nas duas>'
+export NODE_ID=1 PEERS="2=<IP-do-B>:50051"
+export TSP_CITIES=60 TSP_SEED=42 ROUNDS=30 ANTS=40
+export RPC_TIMEOUT_MS=1500 BROADCAST_TIMEOUT_MS=5000 COORDINATOR_TIMEOUT_MS=8000
+export START_DELAY_MS=2000 PEER_WAIT_MS=120000
+java -jar target/aco-node.jar        # ou: docker run --rm --network host -e ... aco-node
+```
 
-- [ ] `hostname -I` + `ss -ltn | grep 50051` em cada máquina (nó ouvindo).
-- [ ] `Novo líder: N4` nas 4 máquinas no mesmo intervalo.
-- [ ] `LÍDER: todos os 3 peers responderam; iniciando as rodadas` (barreira funcionou).
-- [ ] `LÍDER: rodada 30 concluída; melhor global = ...` e `FIM: melhor rota = ...`.
+Evidências a salvar em `docs/evidencias/` (print ou `.log`), com data, IP e hash do commit:
+
+- [ ] `hostname -I` + `ss -ltn | grep 50051` nas duas (nó ouvindo).
+- [ ] `Novo líder: N2` nas duas no mesmo intervalo (maior id vence).
+- [ ] `LÍDER: todos os 1 peers responderam; iniciando as rodadas` (barreira ligada).
+- [ ] `LÍDER: rodada 30 concluída; melhor global = ...` e `FIM: melhor rota = ...` **iguais** nos dois logs.
 - [ ] `[L=...]` de Lamport crescendo nos logs.
-- [ ] **Failover real:** desligar/`Ctrl+C` na máquina do líder → `Líder N4 não responde há 3
-  heartbeats` → `Novo líder: N3` nas 3 sobreviventes → rodadas seguem com `[1, 2, 3]`.
+- [ ] **Failover:** `Ctrl+C` na máquina do líder → `Novo líder: N1` na sobrevivente e a rodada
+  seguinte com `[1]`.
 
-**Pronto quando:** as 6 evidências existem, com data e IP visíveis, e a suíte roda no commit usado
-no ensaio (anotar o hash no relatório).
+**Pronto quando:** as duas máquinas terminam as 30 rodadas com a mesma melhor rota e o failover
+aparece nos logs. Se o Wi-Fi da faculdade bloquear tráfego entre hosts (ver `docs/LAN.md` §4),
+registrar o diagnóstico e seguir com a evidência Docker — **não é bloqueador**.
+
+> O ensaio de 4 máquinas com as 6 evidências completas de `docs/LAN.md` §3 passa a ser item da
+> **Entrega 2**, junto com a apresentação de 10 min.
 
 ## 2. Ajustes técnicos antes da demo
 
@@ -167,7 +186,8 @@ mesmo tempo?".
 - [ ] Lamport + Ricart-Agrawala, e o argumento do `PheromoneMatrixTest` (sem SC as réplicas divergem) — D
 - [ ] Desafios encontrados (usar §6 de `docs/ARQUITETURA.md`: lento × morto, peer pulado, réplica sem versão)
 - [ ] Papel de cada aluno (e quem fez o quê no código — bater com `git shortlog -sn`)
-- [ ] Resultados: tabela do ensaio físico (nós, rodadas, tempo por rodada, melhor rota, tempo de failover)
+- [ ] Resultados: tabela do ensaio (2 máquinas + compose: nós, rodadas, tempo por rodada,
+  melhor rota, tempo de failover)
 
 > Lembrete do enunciado: IA só para revisar/corrigir texto. Texto praticamente gerado por IA é desconsiderado.
 
@@ -180,7 +200,7 @@ mesmo tempo?".
 - [ ] Abrir PR do branch de trabalho (se a disciplina exigir) e conferir que o merge não deixou
   commit órfão do `entrega1/validacoes`.
 - [ ] Confirmar **mesmo commit** em todas as máquinas do ensaio (`git rev-parse --short HEAD`).
-- [ ] `git status` limpo nos 4 nós; `dependency-reduced-pom.xml` e `target/` já estão ignorados.
+- [ ] `git status` limpo em cada máquina; `dependency-reduced-pom.xml` e `target/` já estão ignorados.
 - [ ] Anotar versões usadas no relatório: `java -version`, `docker --version`, `docker compose version`.
 
 ## 5. Backlog — Entrega 2 (não mexer agora)
@@ -196,3 +216,5 @@ Do §6 de `docs/ARQUITETURA.md`:
 - 2PC na atualização de feromônio.
 - Segurança: sem TLS o token trafega em claro e `sender_id` pode ser forjado → mTLS por nó.
 - Análise de desempenho: 1 nó vs. 2, 3 e 4 nós.
+- **Demonstração ao vivo:** cluster em 4 máquinas físicas, evidências completas de `docs/LAN.md` §3
+  e roteiro de failover ensaiado — é requisito da apresentação de 10 min da Entrega 2.
