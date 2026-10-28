@@ -1,8 +1,25 @@
 \section{Resultados}
 
-% FONTES dos numeros: docs/AUDITORIA.md (execucao de 20/10) e o ensaio de compose LAN de 28/10
-% (4 nos, 60 cidades, 40 formigas, seed 42). R5: arquivar os logs em docs/evidencias/ e
-% confirmar estes numeros com o ensaio de 2 maquinas fisicas.
+% ============================ ROTEIRO ============================
+% Fontes dos numeros: docs/AUDITORIA.md (20/10) e ensaio de compose LAN em 1 maquina (28/10).
+% R4: confirmar com o ensaio de 2 maquinas (docs/evidencias/) ou remover a frase sobre
+% maquinas fisicas.
+%
+% [4.1 O que a tabela mostra -- 1 paragrafo]
+%  - Replicas convergem: ao fim das rodadas as matrizes sao identicas nos 4 nos
+%    (ClusterIntegrationTest.elegeMaiorIdExecutaTodasAsRodadasEReplicasConvergem).
+%  - Custo por rodada: ~50 ms de computo local contra 1 broadcast sincrono; ou seja, o
+%    gargalo e a rede, nao as formigas.
+%  - Failover: ~7,5 s na LAN = 5 heartbeats de 1,5 s + eleicao; no compose (heartbeat 1 s)
+%    sao ~5 s. Comparar com o que se esperaria sem detector (rodada de 30 s por timeout).
+%  - Honestidade metodologica: a linha de tempo foi medida em 1 maquina com 4 containers;
+%    4000 rodadas e 600 rodadas com seguidor morto vem da auditoria de 20/10.
+%
+% [4.2 Ensaio em 2 maquinas -- 1 paragrafo, so se for feito]
+%  - Mesmo commit nas duas, porta 50051 liberada, mesmo CLUSTER_TOKEN.
+%  - Reportar: 30 rodadas, ms/rodada, melhor rota igual nos dois logs, tempo de failover.
+%  - Se nao for feito, APAGAR a frase e nao mencionar maquinas fisicas.
+% =================================================================
 
 \begin{table}[t]
   \centering

@@ -20,14 +20,24 @@ no fim). Eles já estão no `.gitignore` da raiz.
 
 | Arquivo | Estado |
 |---|---|
-| `main.tex` | Título, autores (2 de 4+), resumo/abstract como marcador, `\input` das seções |
+| `main.tex` | Título, 4 autores, resumo/abstract e palavras-chave com roteiro |
 | `sbc-template.sty` | Estilo oficial da SBC, vendorizado (cabeçalho original preservado) |
-| `secoes/01` a `03` | Títulos, tabela de mensagens e figuras prontos; **prosa pendente** |
-| `secoes/04-resultados` | Tabela com números medidos; falta o parágrafo de análise |
-| `secoes/05-desafios` | 4 tópicos da auditoria como roteiro (escritos como lembrete, não como texto) |
-| `secoes/06-papeis` | Tabela pronta, nomes pendentes |
+| `secoes/01` a `06` | Tabelas/figuras prontos **e um roteiro factual** no topo do arquivo; prosa pendente |
 | `secoes/07-referencias` | 6 referências no formato SBC, escritas à mão |
 | `figuras/*.tex` | TikZ: arquitetura e sequência do Ricart-Agrawala (vetorial, sem PNG) |
+
+### Como usar o roteiro de cada seção
+
+Cada arquivo de `secoes/` abre com um bloco de comentários marcado `% ==== ROTEIRO ====`.
+Ali estão os **fatos** que a seção precisa afirmar — com número e `arquivo:linha` de onde
+veio — e, em alguns blocos, uma "frase-alvo" que resume o argumento. O roteiro **não** está
+no PDF: é um `%` para cada linha.
+
+Fluxo por pessoa: ler o roteiro → escrever 2 a 4 frases por bloco → apagar o roteiro →
+compilar. Se um fato do roteiro estiver errado, corrija **no texto**, não no roteiro.
+
+Para medir o espaço livre sem os marcadores: troque `\newif\ifpendentes \pendentestrue` por
+`\pendentesfalse` no `main.tex` (hoje: 4 páginas com marcadores, 3 sem).
 
 Os marcadores vermelhos `[PENDENTE: ...]` aparecem no PDF de propósito: são o checklist visual do
 que ainda falta escrever. **Remova todos antes de entregar** (`grep -rn pendente secoes/`).
@@ -59,8 +69,10 @@ Se a SBC publicar uma versão nova do `.sty`, substitua o arquivo desta pasta pe
 
 ## Pendências (ver `../PENDENCIAS.md` §3)
 
-1. **Autores** — `TODO.md` ainda tem `A = ____`; hoje o `git shortlog` mostra 2 pessoas com commits.
-2. **Data/formato da entrega** — confirmar no Canvas.
-3. **Texto** — uma seção por pessoa, conforme a divisão do `TODO.md`.
-4. **Ensaio em 2 máquinas** — confirmar os números da Tabela 2 e citar na §4.
-5. **Remover os marcadores `\pendente`** e conferir o limite de 4 páginas.
+1. ~~Autores~~ — fechado: Pedro Henrique Vilaça Valverde, Marcus Prado Silva,
+   Gabriel Batista de Almeida e Eduardo Alves Salgado Lisboa Oliveira.
+2. **Módulo de Gabriel e Eduardo** — a Tabela 3 só tem o que o git comprova.
+3. **Data/formato da entrega** — confirmar no Canvas.
+4. **Texto** — uma seção por pessoa, a partir do roteiro de cada arquivo.
+5. **Ensaio em 2 máquinas** — confirmar os números da Tabela 2 e citar na §4.
+6. **Remover os marcadores `\pendente` e os roteiros** e conferir o limite de 4 páginas.

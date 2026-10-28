@@ -1,14 +1,53 @@
 \section{Requisitos Implementados}
 
-% FONTES: docs/ARQUITETURA.md §5 (5.1 gRPC, 5.2 Bully, 5.3 Lamport, 5.4 Ricart-Agrawala),
-%         docs/algoritmos/*.md (algoritmo + diagrama de sequencia de cada um),
-%         docs/classes/*.md (detalhe de implementacao por classe)
-% O enunciado pede NO MINIMO DOIS requisitos; aqui sao quatro. Cada subsecao deve caber em
-% ~1/3 de pagina: algoritmo, mensagens e UMA decisao de projeto.
+% ============================ ROTEIRO ============================
+% Fontes: docs/ARQUITETURA.md §5, docs/algoritmos/*.md, docs/classes/*.md
+% Cada subsecao cabe em ~1/3 de pagina: algoritmo, mensagens e UMA decisao de projeto.
+%
+% [3.1 gRPC]  src/main/proto/node.proto, rpc/PeerNetwork.java, rpc/NodeServiceImpl.java
+%  - Oito RPCs unarios (sem streaming) e um canal por peer, reutilizado por todos os modulos.
+%  - Deadline em toda chamada, configuravel por ambiente: RPC_TIMEOUT_MS (500 ms no padrao,
+%    1500 em LAN), BROADCAST_TIMEOUT_MS, COORDINATOR_TIMEOUT_MS
+%    (config/NodeConfig.java:63-67; docs/LAN.md §5).
+%  - Autenticacao: interceptor exige "x-cluster-token" -> UNAUTHENTICATED; sender_id fora de
+%    PEERS -> PERMISSION_DENIED (ClusterAuth.java:15-46; NodeServiceImpl.java:141).
+%  - Decisao: limite de 64 MiB por mensagem (PeerNetwork.java:71). O padrao de 4 MiB do gRPC
+%    estourava a matriz a partir de ~725 cidades (AUDITORIA F8). Nao ha chunking.
+%
+% [3.2 Bully]  election/BullyElection.java, election/LeaderMonitor.java
+%  - Tres passos: ELECTION so para ids maiores; se ninguem responde OK, vira lider e envia
+%    COORDINATOR; se alguem responde, espera o COORDINATOR por 3 s e recomeca
+%    (BullyElection.java:72-111).
+%  - Receber ELECTION de id menor = responder OK e iniciar a propria eleicao: a candidatura
+%    sobe ate o maior vivo (BullyElection.java:124-128).
+%  - COORDINATOR de id menor e contestado, para o invariante "lider = maior vivo" se
+%    restabelecer sem intervencao (BullyElection.java:131-142).
+%  - Deteccao: heartbeat de 1 s; 5 faltas seguidas (~5 s) disparam eleicao
+%    (LeaderMonitor.java:21,37,63). Por que 5 e nao 1: um timeout isolado pode ser GC.
+%  - Numero medido: failover em ~7,5 s na configuracao LAN (5 x 1,5 s) -- Tabela 2.
+%
+% [3.3 Lamport]  clock/LamportClock.java
+%  - Evento local/envio: tick(); recebimento: max(local, remoto)+1 (LamportClock.java:18-30).
+%  - Dois usos: ordenar os pedidos de seccao critica e numerar os logs ([L=...]).
+%  - Decisao: nao usamos relogio fisico porque as maquinas nao tem GPS/PTP; para decidir
+%    quem espera basta ordem causal, nao instante.
+%  - Frase-alvo: "o relogio de Lamport nao mede tempo, ordena eventos."
+%
+% [3.4 Ricart-Agrawala]  mutex/RicartAgrawala.java
+%  - Estados RELEASED/WANTED/HELD (linha 36); prioridade pelo par (request_ts, id).
+%  - REQUEST a todos; REPLY carrega o request_ts autorizado, entao REPLY de pedido antigo
+%    e descartado (evita autorizacao atrasada).
+%  - Custo 2(N-1) mensagens por entrada (N-1 REQUEST + N-1 REPLY).
+%  - Tolerancia: pedido reenviado a cada 500 ms (LIVENESS_POLL_MS, linha 39) e peer que
+%    deixou de estar vivo deixa de ser aguardado (linhas 93-99). Custo: falha conta como
+%    permissao -- e o risco que vira desafio na Secao 5.
+%  - Argumento de projeto: sem exclusao, replicas divergem (teste PheromoneMatrixTest);
+%    com exclusao, as matrizes ficam identicas (ClusterIntegrationTest).
+% =================================================================
 
 \subsection{RPC -- gRPC}
 % src/main/proto/node.proto, rpc/PeerNetwork.java, rpc/NodeServiceImpl.java, rpc/ClusterAuth.java
-\pendente{servi\c{c}o \'unico; deadlines; token no interceptor; 64 MiB}
+\pendente{servi\c{c}o \'unico; deadlines por ambiente; token no interceptor; 64 MiB}
 
 \subsection{Elei\c{c}\~ao de l\'ider -- Bully}
 % election/BullyElection.java, election/LeaderMonitor.java, docs/algoritmos/bully.md

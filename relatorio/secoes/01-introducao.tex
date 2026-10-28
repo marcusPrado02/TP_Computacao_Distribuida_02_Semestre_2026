@@ -1,9 +1,30 @@
 \section{Introdu\c{c}\~ao}
 
-% FONTES (nao copiar: usar como base factual)
-%   docs/algoritmos/aco-tsp.md ....... problema, ACO, instancias
-%   docs/ENUNCIADO.md ................ requisitos e criterios de avaliacao
-%   README.md ........................ como o sistema roda
+% ============================ ROTEIRO ============================
+% Cada bloco abaixo vira 1 paragrafo. Os bullets sao FATOS (com fonte);
+% a frase e de voces. Remova este bloco depois de escrever.
+%
+% [1.1 Problema]  fonte: docs/algoritmos/aco-tsp.md
+%  - TSP: menor ciclo que visita as n cidades uma vez e volta; NP-dificil.
+%  - Instancia usada: 60 cidades, distancia euclidiana (TSP_CITIES=60, TSP_SEED=42).
+%  - Por que distribuir: as formigas sao independentes -> o custo local divide bem;
+%    o unico acoplamento e a matriz de feromonio.
+%  - Frase-alvo: "Cada no explora um subconjunto de formigas e o acoplamento entre eles
+%    se resume a matriz de feromonio."
+%
+% [1.2 O que foi construido]
+%  - Java 21 + gRPC; 4 nos (1 lider + 3 trabalhadores); Docker Compose e execucao em LAN.
+%  - Sem banco/estado externo: matriz n x n replicada em memoria, seccao critica distribuida.
+%  - Evidencia de funcionamento: 40 testes automatizados, compose de 4 nos, failover N4 -> N3.
+%
+% [1.3 Requisitos]
+%  - Quatro dos seis itens do enunciado: gRPC, Lamport, Bully e Ricart-Agrawala.
+%  - O minimo exigido era dois. Dizer isso de forma direta: e o criterio de complexidade.
+%  - Frase-alvo: "Optamos por implementar quatro requisitos, e nao o minimo de dois."
+%
+% [1.4 Organizacao]
+%  - Uma frase: Secao 2 arquitetura, 3 requisitos, 4 resultados, 5 desafios, 6 papeis.
+% =================================================================
 
 \pendente{problema: TSP e por que distribuir}
 

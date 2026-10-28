@@ -187,7 +187,7 @@ cd relatorio && docker run --rm -v "$PWD":/w -w /w texlive/texlive:latest \
 ```
 
 - [x] Template SBC vendorizado (`relatorio/sbc-template.sty`) + `main.tex` com a estrutura
-- [x] Título, autores (2 de 4+), resumo/abstract e palavras-chave como marcadores
+- [x] Título, 4 autores, resumo/abstract e palavras-chave com roteiro
 - [x] Figuras vetoriais em TikZ: arquitetura e sequência do Ricart-Agrawala (`relatorio/figuras/`)
 - [x] Tabela de mensagens (fato, extraído do `node.proto`) e tabela de resultados com os números medidos
 - [x] 6 referências no formato SBC (`secoes/07-referencias.tex` + `referencias.bib`)
@@ -202,13 +202,16 @@ Pendente (o que ainda falta para a entrega):
   handshake, TSPLIB) e Marcus (Ricart-Agrawala, testes, docs), porque é o que o git comprova.
   Confirmar quem ficou com B (ACO/rodadas) e C (Bully/detector) e preencher as duas linhas.
 - [ ] **R2 — Data e formato:** confirmar no Canvas o prazo e se é upload de PDF.
-- [ ] **R3 — Texto de cada seção**, uma pessoa por bloco (mapa no `relatorio/README.md`):
+- [x] **R3a — Roteiro factual por seção:** cada `secoes/0X.tex` (e o resumo no `main.tex`) abre com
+  um bloco `% ROTEIRO` com os fatos, os números e o `arquivo:linha` de origem — e, em alguns,
+  uma "frase-alvo". Não sai no PDF (é comentário). O texto nasce dele.
+- [ ] **R3b — Transformar o roteiro em prosa**, uma pessoa por bloco (mapa no `relatorio/README.md`):
   - [ ] Introdução: problema, ACO/TSP, 4 requisitos atendidos (o enunciado exige 2) — B
   - [ ] Arquitetura: entidades, mensagens, uma rodada — A
   - [ ] gRPC + 64 MiB + token — A
   - [ ] Bully + detector (5 heartbeats) + failover — C
   - [ ] Lamport + Ricart-Agrawala + `PheromoneMatrixTest` (sem SC as réplicas divergem) — D
-  - [ ] Desafios: usar F1/F2/F8/F9 de `docs/AUDITORIA.md` (lento × morto é o melhor argumento)
+  - [ ] Desafios: F1/F2-F3/F8/F9 de `docs/AUDITORIA.md` (lento × morto é o melhor argumento)
 - [ ] **R4 — Resultados:** confirmar a Tabela 2 com o ensaio de 2 máquinas (ver `docs/evidencias/`)
   e escrever a análise; se o ensaio não for feito, remover a frase sobre máquinas físicas.
 - [ ] **R5 — Fechamento:** remover todos os marcadores (`grep -rn pendente relatorio/secoes/`),

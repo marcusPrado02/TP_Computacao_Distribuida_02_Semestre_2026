@@ -1,7 +1,36 @@
 \section{Desafios e Problemas Encontrados}
 
-% FONTE: docs/AUDITORIA.md (achados F1 a F13) e docs/ARQUITETURA.md §6.
-% Escolher 3 ou 4 e contar o que aconteceu de verdade -- nao listar todos.
+% ============================ ROTEIRO ============================
+% Fonte: docs/AUDITORIA.md (F1 a F13) e docs/ARQUITETURA.md §6.
+% Escolher 3 dos 4 e contar o que aconteceu; nao listar todos os achados.
+% Cada um rende 3-4 frases: sintoma -> causa -> o que foi feito -> o que ficou em aberto.
+%
+% [5.1 Lento nao e morto]  AUDITORIA F1, ARQUITETURA §6
+%  - Detector e por timeout: nao distingue no lento (GC, pico de carga) de no morto.
+%  - Para nao travar, falha conta como permissao -> dois nos podem entrar na SC juntos.
+%  - Reproduzido com dois RicartAgrawala reais, um REQUEST devolvendo false com o peer vivo.
+%  - Nao foi "corrigido": e limitacao fundamental em sistema assincrono; exige quorum/consenso
+%    (Entrega 2). Dizer isso explicitamente -- e o paragrafo que mostra maturidade.
+%
+% [5.2 Peer morre depois do REQUEST]  F2/F3
+%  - Sintoma: acquire() ficava esperando para sempre (medido: ainda em WANTED apos 3 s).
+%  - Causa: REPLY perdido ou peer que caiu depois de receber o REQUEST.
+%  - Correcao: reenvio do pedido a cada 500 ms + recontato de peer que voltou (quarentena de 2 s).
+%  - Ganho colateral: derrubar um seguidor deixou de custar 30 s por rodada (F4).
+%
+% [5.3 Matriz maior que o limite do gRPC]  F8
+%  - Sintoma: a partir de ~725 cidades o peer falhava com RESOURCE_EXHAUSTED e era marcado
+%    como morto (mensagem de 4,8 MB).
+%  - Correcao: 64 MiB no servidor e nos stubs -> cobre ~2900 cidades. Acima disso falha,
+%    porque nao ha chunking.
+%
+% [5.4 Configuracao divergente]  F9
+%  - Sintoma: token ou PEERS diferentes e cada no se elegia lider e rodava sozinho --
+%    split-brain silencioso, com apenas "inacessivel (UNAUTHENTICATED)" no log.
+%  - Correcao: handshake no startup confere token, remetente e o conjunto {self} U PEERS;
+%    erro fatal encerra o processo com codigo 2.
+%  - Em aberto: dois grupos que nao compartilham nenhum membro ainda nao sao detectados.
+% =================================================================
 
 \pendente{lento n\~ao \'e morto: falha por timeout conta como permiss\~ao (F1)}
 
