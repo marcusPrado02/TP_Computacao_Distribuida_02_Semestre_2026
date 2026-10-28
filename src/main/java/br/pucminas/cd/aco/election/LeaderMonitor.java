@@ -5,9 +5,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/** Detector de falha simples: heartbeat no líder a cada 1 s; 3 falhas seguidas disparam eleição. */
+/** Detector de falha simples: heartbeat no líder a cada 1 s; 5 falhas seguidas disparam eleição. */
 public final class LeaderMonitor implements AutoCloseable {
-    private static final int MAX_MISSES = 3;
+    private static final int MAX_MISSES = 5;
 
     private final int selfId;
     private final BullyElection election;
@@ -33,7 +33,18 @@ public final class LeaderMonitor implements AutoCloseable {
     private void check() {
         try {
             int leader = election.leaderId();
-            if (leader <= 0 || leader == selfId || transport.heartbeat(leader)) {
+            if (leader <= 0) {
+                misses = 0;
+                return;
+            }
+            if (leader == selfId) {
+                // Reanuncia periodicamente: um nó que voltou (ou uma partição) pode ter ficado com
+                // uma visão antiga de líder; o maior id resolve a disputa ao receber este COORDINATOR.
+                misses = 0;
+                transport.broadcastCoordinator();
+                return;
+            }
+            if (transport.heartbeat(leader)) {
                 misses = 0;
                 return;
             }

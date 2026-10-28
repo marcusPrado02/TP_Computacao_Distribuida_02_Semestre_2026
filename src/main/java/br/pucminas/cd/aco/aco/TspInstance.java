@@ -31,16 +31,35 @@ public final class TspInstance {
     public static TspInstance fromTsplib(Path file) throws IOException {
         List<double[]> coords = new ArrayList<>();
         boolean inCoords = false;
+        int lineNumber = 0;
         for (String line : Files.readAllLines(file)) {
+            lineNumber++;
             String trimmed = line.trim();
-            if (trimmed.startsWith("NODE_COORD_SECTION")) {
-                inCoords = true;
-            } else if (trimmed.equals("EOF")) {
-                break;
-            } else if (inCoords && !trimmed.isEmpty()) {
-                String[] parts = trimmed.split("\\s+");
-                coords.add(new double[] {Double.parseDouble(parts[1]), Double.parseDouble(parts[2])});
+            if (!inCoords) {
+                if (trimmed.equals("NODE_COORD_SECTION")) inCoords = true;
+                continue;
             }
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+            // Outra seção (DISPLAY_DATA_SECTION etc.) ou fim do arquivo: para de ler coordenadas.
+            if (trimmed.equals("EOF") || trimmed.endsWith("_SECTION")) break;
+            String[] parts = trimmed.split("\\s+");
+            if (parts.length < 3) {
+                throw new IOException(file + ":" + lineNumber
+                        + ": esperado 'id x y', veio '" + trimmed + "'");
+            }
+            try {
+                coords.add(new double[] {Double.parseDouble(parts[1]), Double.parseDouble(parts[2])});
+            } catch (NumberFormatException e) {
+                throw new IOException(file + ":" + lineNumber
+                        + ": coordenada inválida em '" + trimmed + "'", e);
+            }
+        }
+        if (!inCoords) {
+            throw new IOException(file + ": seção NODE_COORD_SECTION ausente");
+        }
+        if (coords.size() < 3) {
+            throw new IOException(file + ": " + coords.size()
+                    + " cidade(s) em NODE_COORD_SECTION; o TSP precisa de pelo menos 3");
         }
         double[] x = coords.stream().mapToDouble(c -> c[0]).toArray();
         double[] y = coords.stream().mapToDouble(c -> c[1]).toArray();
@@ -48,7 +67,13 @@ public final class TspInstance {
     }
 
     public static TspInstance fromCoords(double[] x, double[] y) {
+        if (x.length != y.length) {
+            throw new IllegalArgumentException("x e y com tamanhos diferentes: " + x.length + " e " + y.length);
+        }
         int n = x.length;
+        if (n < 3) {
+            throw new IllegalArgumentException("instância com " + n + " cidade(s); o TSP precisa de pelo menos 3");
+        }
         double[][] dist = new double[n][n];
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {

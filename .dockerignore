@@ -1,0 +1,9 @@
+# Contexto do build: só pom.xml, src e data são usados pelo Dockerfile.
+.git
+.gitignore
+.env
+target
+dependency-reduced-pom.xml
+relatorio
+AGENTS.md
+*.log

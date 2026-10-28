@@ -70,8 +70,32 @@ class ClusterIntegrationTest {
 
         nodes.remove(2).close(); // derruba o líder N3
 
-        // 3 heartbeats perdidos (~3 s) e nova eleição
+        // 5 heartbeats perdidos (~5 s) e nova eleição
         await(() -> nodes.stream().allMatch(n -> n.leaderId() == 2), 20);
+    }
+
+    /**
+     * Seguidor morto não é o líder: ninguém manda heartbeat nele, então sem probe ele só seria
+     * notado no próximo broadcast (líder) ou nunca (nos pedidos de seção crítica dos outros).
+     * Antes da correção, o líder esperava 30 s por rodada e os seguidores podiam travar.
+     */
+    @Test
+    void quedaDeUmSeguidorNaoTravaNemAtrasaAsRodadas() throws Exception {
+        startCluster(30);
+        await(() -> nodes.stream().allMatch(n -> n.leaderId() == 3), 15);
+        await(() -> nodes.stream().allMatch(n -> n.lastRound() >= 2), 20);
+
+        nodes.remove(0).close(); // N1 é seguidor; N3 continua líder
+        Node leader = nodes.get(1);
+
+        await(leader::finishedAsLeader, 30);
+        for (Node n : nodes) {
+            assertEquals(30, n.lastRound(), "N" + n.id() + " não concluiu as rodadas");
+        }
+        double[] reference = leader.pheromone();
+        for (Node n : nodes) {
+            assertArrayEquals(reference, n.pheromone(), "réplica de N" + n.id() + " divergiu");
+        }
     }
 
     @Test
