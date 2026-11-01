@@ -56,4 +56,11 @@ class NodeConfigTest {
         NodeConfig cfg = new NodeConfig(1, 50051, Map.of(), "token", null, 10, 42, 5, 4, 1.0, 3.0, 0.1, 0, null);
         assertEquals(NodeConfig.Timeouts.defaults(), cfg.timeouts());
     }
+
+    @Test
+    void iteracoesPorRodadaPadraoEhUmEZeroEhRejeitado() {
+        assertEquals(1, config(1, Map.of(), 0.1).iterationsPerRound());
+        assertThrows(IllegalArgumentException.class,
+                () -> new NodeConfig(1, 50051, Map.of(), "token", null, 10, 42, 5, 4, 0, 1.0, 3.0, 0.1, 0, null));
+    }
 }

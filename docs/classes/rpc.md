@@ -45,7 +45,7 @@ Implementa `ElectionTransport` e `MutexTransport`, e oferece os envios das rodad
 | `void sendReply(int to, long requestTs)` | não | `ReplyCS(request_ts)` numa virtual thread. |
 | `void broadcastStartRound(int round)` | não | `StartRound` a todos, assíncrono. |
 | `void sendRoundDone(int leader, int round, Tour t)` | até 500 ms | `RoundDone` ao líder (chamado pela thread da rodada). |
-| `void broadcastPheromone(int round, double[] tau, Tour best, int coordinator)` | até `BROADCAST_TIMEOUT_MS` (2 s no padrão) | Envia a matriz a todos **em paralelo** e espera todas as respostas. O coordenador é sempre tentado; peers em quarentena são pulados. Falhas são logadas, não lançadas. |
+| `void broadcastPheromone(int round, double[] tau, Tour best, int coordinator)` | até `BROADCAST_TIMEOUT_MS` (2 s no padrão) | Envia a matriz a todos **em paralelo** e espera todas as respostas. Espera só os peers vivos; peer dado como morto recebe em segundo plano, e em quarentena é pulado. O coordenador é sempre tentado, mas só é esperado se estiver vivo. Falhas são logadas, não lançadas. |
 | `void close()` | não | Encerra o executor e todos os canais. |
 
 ### O núcleo: `call(peer, timeout, rpc, headerOf)`

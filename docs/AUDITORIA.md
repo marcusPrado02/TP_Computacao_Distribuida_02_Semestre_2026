@@ -32,6 +32,8 @@
 | F11 | Baixa | Ordem de `close()` derrubava módulos antes do servidor; `sendReply` podia lançar `RejectedExecutionException` durante o shutdown. | Revisão + cenário de parada. | Corrigido: servidor para primeiro, espera handlers; `sendReply` ignora rejeição no shutdown. |
 | F12 | Baixa | `Coordinator` aceitava `leader_id` diferente do remetente. | Revisão. | Corrigido: `NodeServiceImpl` ignora anúncio inconsistente. |
 | F13 | Média | Heartbeat de 500 ms podia gerar falso positivo sob carga (eleição desnecessária). | Compose com 4000 rodadas: líder trocou N4→N3→N4 em segundos. | Mitigado: timeout de 1 s e 5 faltas (~5 s). Cenário padrão de 30 rodadas não apresentou troca. |
+| F14 | Alta | Broadcast de feromônio (dentro da SC) esperava o `BROADCAST_TIMEOUT_MS` inteiro por peer morto quando a quarentena de 2 s expirava, e **sempre** esperava o coordenador, mesmo morto. Com o líder caindo no meio da rodada, cada nó da fila ficava 5 s na SC. | `docker-compose.lan.yml`, berlin52, 01/11: `stop node4` → 1ª rodada do novo líder em 15,6 s, a seguinte em 3,4 s; N1/N2/N3 com `ENTROU`→`SAIU` de ~5 s. | Corrigido: só peers vivos são esperados; morto (inclusive coordenador) recebe em segundo plano. Teste `BroadcastPheromoneTest` (peer "buraco negro"). Revalidado: 1ª rodada após a queda em 0,56 s. |
+| F15 | Média | `./tp up` ignorava as opções (`-n`, `-r`, `-f`...) quando já existia `.run/cluster.env`: `cmd_down` fazia `source` do estado antigo por cima das variáveis recém-lidas. | `./tp up -n 4 -f data/berlin52.tsp` subia 3 nós, 300 rodadas, instância aleatória (estado anterior). | Corrigido: `cmd_down` roda em subshell dentro do `up`. |
 
 ## O que continua em aberto (e por quê)
 
