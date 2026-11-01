@@ -59,8 +59,9 @@ Números que podem ser cobrados de qualquer um: **berlin52 = 52 cidades, ótimo 
 # 2. Pedro — comunicação e infraestrutura
 
 **Módulo:** `rpc/` (580 linhas) + `config/` (170) · `node.proto`, `NodeMain`, `Dockerfile`,
-`docker-compose*.yml`, `scripts/tp.sh` · **Seções do relatório:** §2 (arquitetura) e §3.1 (gRPC).
-**Entregável:** ensaio em 2 máquinas, com logs em `docs/evidencias/` (roteiro em `docs/LAN.md` §2).
+`docker-compose*.yml`, `scripts/tp.sh` · **Seções do relatório:** §2 (arquitetura), §3.1 (gRPC) e
+§4 (resultados, incluindo a Tabela 1). **Entregável:** ensaio em 2 máquinas, com logs em
+`docs/evidencias/` (roteiro em `docs/LAN.md` §2) e a montagem final do PDF.
 
 ### Demo
 
@@ -92,12 +93,19 @@ Se houver 2 máquinas: um nó por máquina seguindo `docs/LAN.md` §2, e mostrar
    após a queda do líder levava 15,6 s. Esperando só os vivos (o morto recebe em segundo plano), caiu
    para 0,56 s (F14, `BroadcastPheromoneTest`).
 
+Extra (porque a §4 é sua): **de onde vêm os números da Tabela 1?** — 43 testes do `mvn test`;
+0,94 s de mediana por rodada com `I=1000`; 7542 do ensaio de berlin52; ~10 s do perfil LAN;
+0,56 s medido depois do F14; 4000 rodadas da auditoria de 20/10. A legenda diz explicitamente que
+as medidas foram em **uma** máquina com 4 contêineres e que não medimos speedup 1×N.
+
 ---
 
 # 3. Marcus — relógio lógico e exclusão mútua
 
-**Módulo:** `mutex/` (212 linhas) + `clock/` (43) · **Seções do relatório:** §3.3 e §3.4.
-**Entregável:** `./tp check` e `./tp timeline cs` rodados e a saída arquivada.
+**Módulo:** `mutex/` (212 linhas) + `clock/` (43) · **Seções do relatório:** §3.3, §3.4 e
+§5 (desafios). **Entregável:** `./tp check` e `./tp timeline cs` com a saída arquivada em
+`docs/evidencias/` — é o `check` que sustenta a frase do §4 ("nunca houve dois nós na seção
+crítica").
 
 ### Demo
 
@@ -126,13 +134,20 @@ Extra que costuma cair: *"e se o peer morrer depois de receber o REQUEST?"* — 
 cada 500 ms e quem deixou de estar vivo não é mais aguardado (`RicartAgrawala.java:39,93-99`),
 senão o `acquire()` ficaria preso para sempre (F2/F3).
 
+Extra (porque a §5 é sua): **por que o F1 não foi corrigido?** — porque separar "lento" de "morto"
+exige quórum ou consenso (2PC/Raft); preferimos manter o cluster disponível quando um nó realmente
+cai, e assumimos o risco de dois nós entrarem juntos na SC. É decisão de projeto, documentada em
+`docs/AUDITORIA.md` F1 e na §5 do relatório. Os outros dois desafios da §5 também são seus: REQUEST
+sem REPLY (F2/F3) e configuração divergente virando split-brain silencioso (F9).
+
 ---
 
 # 4. Gabriel — ACO e rodadas
 
-**Módulo:** `aco/` (361 linhas) + `round/` (336) · **Seções do relatório:** §1 (introdução),
-§2.3 (uma rodada) e **Tabela 1** (resultados). **Entregável:** remedir o ensaio de berlin52 e
-preencher a Tabela 1 com os números do ensaio dele, log em `docs/evidencias/`.
+**Módulo:** `aco/` (361 linhas) + `round/` (336) · **Seções do relatório:** §1 (introdução) e
+§2.3 (uma rodada). **Entregável:** remediar o ensaio de berlin52 e entregar o log com os tempos por
+rodada e a melhor rota (`FIM: melhor rota = 7542`), em `docs/evidencias/` — os números alimentam a
+Tabela 1, que fica com o Pedro.
 
 ### Demo
 
@@ -162,8 +177,9 @@ preencher a Tabela 1 com os números do ensaio dele, log em `docs/evidencias/`.
 
 # 5. Eduardo — eleição e detector de falha
 
-**Módulo:** `election/` (271 linhas) · **Seções do relatório:** §3.2 (Bully) e §5 (desafios).
-**Entregável:** rodar o failover cronometrado e registrar os tempos reais (`docs/LAN.md` §3.1).
+**Módulo:** `election/` (271 linhas) · **Seção do relatório:** §3.2 (Bully e detector).
+**Entregável:** rodar o failover cronometrado e registrar os tempos reais (`docs/LAN.md` §3.1) — é a
+linha de *failover* da Tabela 1 e a evidência de que a detecção leva ~8,5 s.
 
 ### Demo
 
@@ -190,11 +206,11 @@ Também vale mostrar a detecção bruta, que é o que a banca cobra em tempo:
    Um timeout isolado pode ser pausa de GC ou pico de rede; eleger à toa custa uma rodada e troca de
    líder desnecessária. Com heartbeat de 1 s e 5 faltas, o falso positivo fica improvável — o preço
    é a latência de detecção: ~5 s no compose e ~8,5 s no perfil LAN (heartbeat de 1,5 s).
-3. **"Lento ≠ morto" é limitação ou bug? Por quê?**
-   É limitação de projeto, não bug: detecção por timeout não consegue distinguir as duas coisas sem
-   quórum ou consenso (2PC/Raft), e optamos por disponibilidade — o cluster não pode travar quando um
-   nó realmente morre. O efeito colateral é que, se o peer só está lento, a falha conta como permissão
-   e dois nós podem entrar juntos na SC (F1, **não corrigido**, documentado em `docs/AUDITORIA.md`).
+3. **Por que o detector é separado do Bully?**
+   Porque respondem perguntas diferentes: o `LeaderMonitor` decide *quando* desconfiar (5 faltas de
+   heartbeat) e o `BullyElection` decide *quem* assume. Juntar os dois acoplaria o tempo de detecção
+   ao algoritmo de eleição, e um falso positivo passaria a custar uma eleição inteira.
+   *("Lento ≠ morto" é a pergunta geral — a resposta está na §5, que é do Marcus.)*
 
 Extra: *"e se dois nós iniciarem eleição ao mesmo tempo?"* — cada um só fala com ids maiores e quem
 recebe `ELECTION` de id menor responde OK e inicia a própria; a disputa converge para o maior id vivo,
@@ -211,8 +227,8 @@ A ordem segue a demo, não os módulos: cada um fala enquanto algo acontece na t
 | 0:00–2:00 | Pedro | `./tp up -n 4` e `./tp status` | problema, arquitetura, nós simétricos, eleição inicial (`Novo líder: N4`) |
 | 2:00–4:00 | Gabriel | `./tp logs rodada -f` com berlin52 | uma rodada: formigas, seção crítica, convergência até 7542 |
 | 4:00–6:00 | Eduardo | `./tp demo failover` | detector (5 heartbeats), Bully, ~10 s até `Novo líder: N3` |
-| 6:00–8:00 | Marcus | `./tp timeline cs` e `./tp check` | ordem de Lamport na SC, nenhum par de `ENTROU` sem `SAIU` |
-| 8:00–10:00 | Pedro | slides | limitações (F1) e o que entra na Entrega 2 |
+| 6:00–8:00 | Marcus | `./tp timeline cs` e `./tp check` | ordem de Lamport na SC, nenhum par de `ENTROU` sem `SAIU`; F1 e o que ficou em aberto |
+| 8:00–10:00 | Pedro | Tabela 1 e slides | resultados (0,94 s/rodada, 7542, ~10 s de failover) e o que entra na Entrega 2 |
 
 Quem opera o teclado na demo é quem responde pela demo. Ensaie com o cluster já rodando: subir do zero
 leva ~20 s e não pode ser descoberto no meio da apresentação.
@@ -227,3 +243,20 @@ leva ~20 s e não pode ser descoberto no meio da apresentação.
 - O material de estudo por algoritmo está em `docs/algoritmos/` (§9 de cada um tem a lista completa
   de perguntas prováveis): `aco-tsp.md` (12), `bully.md` (10), `lamport.md` (9),
   `ricart-agrawala.md` (8).
+
+## Por que Pedro e Marcus concentram as seções
+
+Duas razões, e nenhuma delas é hierarquia:
+
+1. **Volume de texto e de evidência.** Pedro responde por §2 (arquitetura, o item mais detalhado do
+   enunciado), §3.1, §4 com a Tabela 1, o ensaio em duas máquinas e a montagem final — as partes que
+   o professor mais cobra e as únicas com medição de campo. Marcus responde por dois requisitos
+   (Lamport + Ricart-Agrawala), pela §5 inteira (F1/F2/F3 são do mutex) e pela ferramenta `./tp check`,
+   que é a prova citada no §4.
+2. **O que o git comprova.** `git log --format=%an -- src/main` tem só dois autores: Marcus (6
+   commits) e Pedro (5). Gabriel e Eduardo entram na etapa de estudo, ensaio e apresentação. O §6 não
+   afirma autoria de código de ninguém ("ficou com", "ficou responsável por") — afirma
+   responsabilidade pela demonstração, que é o que a arguição cobra.
+
+Se Gabriel ou Eduardo quiser assumir mais, a troca natural é dar a §5 a quem fizer o ensaio de
+failover completo (F1 + F2/F3 + F9), e não dividir a §3 em pedaços menores.

@@ -21,11 +21,10 @@
   \label{tab:resultados}
 \end{table}
 
-As réplicas convergem: ao final, as matrizes são idênticas nos quatro nós, e o \textit{cluster}
-atinge o ótimo conhecido em \textit{berlin52}, o que mostra que a distribuição não degradou a
-solução. A rodada leva cerca de 0,94 s, quase toda em CPU local, com a rede entrando uma vez por
-rodada. O \textit{failover} leva cerca de 10 s até o anúncio do novo líder, dos quais 8,5 s são
-apenas o detector.
+As réplicas convergem ao final, e o \texttt{./tp check} confirma que nunca houve dois nós na seção
+crítica; o \textit{cluster} atinge o ótimo conhecido em \textit{berlin52}. A rodada leva cerca de
+0,94 s, quase toda em CPU local, com a rede entrando uma vez por rodada. O \textit{failover} leva
+cerca de 10 s até o anúncio do novo líder, dos quais 8,5 s são apenas o detector.
 
 Medir o \textit{failover} de ponta a ponta revelou um custo que o teste unitário não via: a primeira
 rodada após a queda levava 15,6 s, porque o \textit{broadcast} aguardava o \textit{peer} morto até o

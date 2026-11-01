@@ -6,16 +6,17 @@ o material de estudo e as perguntas de cada fatia estão em [`docs/ARGUICAO.md`]
 
 ## Divisão
 
-| Pessoa | Módulo | Pacotes/arquivos | Entregável verificável (Entrega 1) |
-|---|---|---|---|
-| A — Pedro Henrique Vilaça Valverde | gRPC, infraestrutura, Docker, LAN | `rpc/`, `node.proto`, `NodeMain`, `Dockerfile`, `docker-compose*.yml` | ensaio em 2 máquinas + logs em `docs/evidencias/` |
-| B — Gabriel Batista de Almeida | ACO / TSP e rodadas | `aco/`, `round/` | remedir berlin52 e fechar a Tabela 1 do relatório |
-| C — Eduardo Alves Salgado Lisboa Oliveira | Eleição de líder (Bully) + detector | `election/` | rodar o failover cronometrado (`docs/LAN.md` §3.1) e registrar os tempos |
-| D — Marcus Prado Silva | Relógio de Lamport + Ricart-Agrawala | `clock/`, `mutex/` | `./tp check` + `./tp timeline cs` com a saída arquivada |
+| Pessoa | Módulo | Pacotes/arquivos | Seções do relatório | Entregável verificável |
+|---|---|---|---|---|
+| A — Pedro Henrique Vilaça Valverde | gRPC, infraestrutura, Docker, LAN | `rpc/`, `node.proto`, `NodeMain`, `Dockerfile`, `docker-compose*.yml` | **§2, §3.1 e §4 + Tabela 1** | ensaio em 2 máquinas + montagem final do PDF |
+| B — Gabriel Batista de Almeida | ACO / TSP e rodadas | `aco/`, `round/` | §1 e §2.3 | log do ensaio de berlin52 (tempos + `melhor rota = 7542`) |
+| C — Eduardo Alves Salgado Lisboa Oliveira | Eleição de líder (Bully) + detector | `election/` | §3.2 | failover cronometrado (`docs/LAN.md` §3.1) |
+| D — Marcus Prado Silva | Relógio de Lamport + Ricart-Agrawala | `clock/`, `mutex/` | **§3.3, §3.4 e §5** | `./tp check` + `./tp timeline cs` arquivados |
 
-> O relatório (`relatorio/secoes/06-papeis.tex`) diz que cada aluno é **responsável** pelo seu módulo
-> — responsável pela demonstração e pela explicação. Quem não escreveu o código diz "acompanhei e
-> reproduzi", não "implementei" (regra em `docs/ARGUICAO.md`).
+> Pedro e Marcus concentram seções porque concentram o texto e a evidência (e porque o git só tem os
+> dois em `src/main`). O relatório diz que cada aluno é **responsável** pelo seu módulo —
+> responsável pela demonstração e pela explicação. Quem não escreveu o código diz "acompanhei e
+> reproduzi", não "implementei" (regra e justificativa em `docs/ARGUICAO.md` §7).
 
 ## Semana 1 — entender e fechar o núcleo
 - [ ] Todos: ler `docs/ARQUITETURA.md`, rodar testes e cluster **só com Docker** (sem Java/Maven no host):
@@ -50,10 +51,14 @@ Nenhum é opcional: cada linha do §6 do relatório precisa de um artefato em `d
 
 | Quem | O que entregar | Como verificar |
 |---|---|---|
-| Pedro (A) | logs dos 2 nós (mesmo líder, mesma melhor rota) + tempo de subida | `docs/LAN.md` §2; arquivo em `docs/evidencias/` |
-| Gabriel (B) | saída de `./tp up -f data/berlin52.tsp -i 1000` com `FIM: melhor rota = 7542` e os tempos por rodada | preencher a Tabela 1 com os números dele |
-| Eduardo (C) | `./tp demo failover` com os tempos (`Novo líder: N3 em ~Xs`) | comparar com `docs/LAN.md` §3.1 (~2 s / ~8,5 s / ~10 s) |
-| Marcus (D) | `./tp check` (0 violações) e `./tp timeline cs` (ordem de Lamport) | anexar a saída em `docs/evidencias/` |
+| Pedro (A) | logs dos 2 nós (mesmo líder, mesma melhor rota, tempo de subida) **e o PDF final** | `docs/LAN.md` §2; arquivo em `docs/evidencias/` |
+| Marcus (D) | `./tp check` (0 violações) e `./tp timeline cs` (ordem de Lamport) | anexar a saída em `docs/evidencias/`; é o que sustenta a frase do §4 |
+| Gabriel (B) | saída de `./tp up -f data/berlin52.tsp -i 1000` com `FIM: melhor rota = 7542` e os tempos por rodada | compara com os números da Tabela 1 (escrita pelo Pedro) |
+| Eduardo (C) | `./tp demo failover` com os tempos (`Novo líder: N3 em ~Xs`) | compara com `docs/LAN.md` §3.1 (~2 s / ~8,5 s / ~10 s) |
+
+Gabriel e Eduardo **não escrevem seção nova**: entregam o log/medição e revisam o parágrafo que o
+Pedro e o Marcus escreveram a partir dos números deles. Se alguém quiser assumir mais, a troca
+natural é passar a §5 inteira para quem fizer o ensaio de failover completo (F1 + F2/F3 + F9).
 
 ## Arguição (ver `docs/ARGUICAO.md`)
 

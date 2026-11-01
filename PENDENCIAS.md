@@ -232,11 +232,13 @@ Pendente (o que ainda falta para a entrega):
   Gabriel Batista de Almeida e Eduardo Alves Salgado Lisboa Oliveira (4, dentro do 4–5 do enunciado).
 - [x] **R1b — Divisão em §6:** decidida em 01/11 — A = Pedro (`rpc/`, `config/`, infra, LAN),
   B = Gabriel (`aco/`, `round/`), C = Eduardo (`election/`), D = Marcus (`clock/`, `mutex/`).
-  O §6 usa "ficou responsável por" (não afirma autoria de código) e nomeia um entregável verificável
-  por pessoa. As tabelas de entregáveis e as perguntas de arguição estão em
-  [`docs/ARGUICAO.md`](docs/ARGUICAO.md) e no `TODO.md`.
-  **Risco assumido:** só Pedro e Marcus commitaram; Gabriel e Eduardo precisam fazer o entregável
-  deles (remedir berlin52 / rodar o failover) para a frase do §6 se sustentar.
+  Distribuição revisada para refletir o peso real: Pedro responde por §2, §3.1 e §4 + Tabela 1
+  (mais o ensaio em 2 máquinas e a montagem do texto); Marcus por §3.3, §3.4 e §5 + `./tp check`;
+  Gabriel por §1 e §2.3 + o log do ensaio de berlin52; Eduardo por §3.2 + o failover cronometrado.
+  O §6 usa "ficou com"/"ficou responsável por" (não afirma autoria de código). Tabelas de
+  entregáveis e perguntas de arguição em [`docs/ARGUICAO.md`](docs/ARGUICAO.md) e no `TODO.md`.
+  **Risco assumido:** só Pedro e Marcus commitaram (`git log -- src/main`); Gabriel e Eduardo precisam
+  entregar o log/medição deles para a frase do §6 se sustentar.
 - [ ] **R2 — Data e formato:** confirmar no Canvas o prazo e se é upload de PDF.
 - [x] **R3 — Texto das seis seções e do resumo/abstract:** escrito, com os números de 01/11.
 - [ ] **R4 — Ensaio de 2 máquinas:** §4 hoje não menciona máquinas físicas (só a legenda da
