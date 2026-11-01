@@ -18,12 +18,14 @@ cinco faltas.
 
 \subsection{Mensagens}
 
-O serviço \texttt{NodeService} tem oito RPCs unários, sem \textit{streaming}. A eleição leva o
-identificador do candidato; o pedido de seção crítica, o carimbo que o identifica, e a resposta
-devolve qual pedido está autorizando; a atualização leva a matriz e a melhor rota; os demais, a
-rodada ou o resultado local. Todo cabeçalho leva o remetente e o carimbo de Lamport, e o token do
-\textit{cluster} viaja no \textit{metadata} \texttt{x-cluster-token}, conferido por um interceptor
-antes do \textit{handler}.
+O serviço \texttt{NodeService} tem oito RPCs unários, sem \textit{streaming}: eleição
+(\texttt{Election}, cuja resposta faz o papel do OK) e \texttt{Coordinator}; \texttt{Heartbeat};
+pedido e resposta de seção crítica (\texttt{RequestCS} e \texttt{ReplyCS}); início e fim de rodada
+(\texttt{StartRound} e \texttt{RoundDone}); e atualização da matriz (\texttt{UpdatePheromone}), que
+leva a matriz e a melhor rota. O pedido de seção crítica leva o carimbo que o identifica, e a
+resposta devolve qual pedido está autorizando. Todo cabeçalho leva o remetente e o carimbo de
+Lamport, e o token do \textit{cluster} viaja no \textit{metadata} \texttt{x-cluster-token},
+conferido por um interceptor antes do \textit{handler}.
 
 \subsection{Uma rodada}
 

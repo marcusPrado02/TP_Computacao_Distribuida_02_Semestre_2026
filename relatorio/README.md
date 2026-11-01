@@ -86,7 +86,7 @@ Se a SBC publicar uma versão nova do `.sty`, substitua o arquivo desta pasta pe
 2. **Reescrever o texto** com palavras do grupo — é o item que decide a nota (ver aviso no topo).
 3. ~~Divisão de Gabriel e Eduardo~~ — fechada: B = Gabriel (`aco/`, `round/`) e C = Eduardo
    (`election/`). O §6 diz "ficou com"/"ficou responsável por" e distribui as seções pelo peso real:
-   Pedro (§2, §3.1, §4 + Tabela 1), Marcus (§3.3, §3.4, §5), Gabriel (§1, §2.3), Eduardo (§3.2).
+   Pedro (§2, §3.1, §4 + Tabela 1), Marcus (§3.3, §3.4, §5), Gabriel (§1, §2.2), Eduardo (§3.2).
    Entregáveis e perguntas de arguição em [`../docs/ARGUICAO.md`](../docs/ARGUICAO.md).
 4. **Data/formato da entrega** — confirmar no Canvas.
 5. **Ensaio em 2 máquinas** — se for feito, acrescentar um parágrafo em §4 (hoje não menciona);

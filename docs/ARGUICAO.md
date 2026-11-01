@@ -145,7 +145,7 @@ sem REPLY (F2/F3) e configuração divergente virando split-brain silencioso (F9
 # 4. Gabriel — ACO e rodadas
 
 **Módulo:** `aco/` (361 linhas) + `round/` (336) · **Seções do relatório:** §1 (introdução) e
-§2.3 (uma rodada). **Entregável:** remediar o ensaio de berlin52 e entregar o log com os tempos por
+§2.2 (uma rodada). **Entregável:** remediar o ensaio de berlin52 e entregar o log com os tempos por
 rodada e a melhor rota (`FIM: melhor rota = 7542`), em `docs/evidencias/` — os números alimentam a
 Tabela 1, que fica com o Pedro.
 
