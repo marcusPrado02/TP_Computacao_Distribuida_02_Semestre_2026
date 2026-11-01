@@ -23,6 +23,7 @@ Script com as operações comuns (Linux, macOS, WSL ou Git Bash; precisa de Java
 ```bash
 ./tp                       # menu interativo (pergunta os parâmetros)
 ./tp up -n 4 -r 30         # sobe 4 nós locais em background
+./tp up -f data/berlin52.tsp -i 1000   # demo: TSPLIB (ótimo 7542) e rodada de ~1 s
 ./tp status                # quem está vivo, líder visto, rodada e relógio de cada nó
 ./tp kill 4                # derruba o líder (crash) para ver a reeleição
 ./tp timeline cs           # seção crítica de todos os nós, em ordem de Lamport

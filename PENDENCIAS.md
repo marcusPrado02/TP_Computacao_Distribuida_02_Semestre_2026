@@ -1,31 +1,33 @@
 # Pendências — Entrega 1
 
-> Fotografia de **28/10/2026**, a partir do commit `176620a` (*Endurece o cluster para LAN…*).
+> Fotografia de **28/10/2026**, a partir do commit `176620a` (*Endurece o cluster para LAN…*);
+> **atualizada em 01/11/2026** (branch `entrega1/pendencias-finais`: 2.1, 2.2, 2.3, 2.4 e §4 resolvidos;
+> de quebra, correções F14 e F15 em `docs/AUDITORIA.md`).
 > Este arquivo é a **lista de ação** (o que fazer, como verificar, quando está pronto).
 > O plano por pessoa continua em [`TODO.md`](TODO.md); o roteiro do ensaio físico, em
 > [`docs/LAN.md`](docs/LAN.md).
 
-**Resumo:** 0 bloqueadores (1.1 concluído em `3290e09`), 1 ensaio recomendado (1.2), 4 ajustes de
-demo/parâmetros, 7 itens de relatório. Nada de Entrega 2 começa antes disso.
+**Resumo (01/11):** 0 bloqueadores técnicos. Falta: ensaio físico em 2 máquinas (1.2, recomendado),
+estudo do Bully por C (2.4, material pronto) e o relatório (§3). Nada de Entrega 2 começa antes disso.
 
 | # | Item | Dono (TODO.md) | Bloqueia a entrega? |
 |---|---|---|---|
 | 1.1 | Reconciliar `main` com `entrega1/validacoes` | A (todos revisam) | **Feito** (`3290e09`) |
-| 1.2 | Ensaio mínimo em **2** máquinas | A | Não — recomendado |
-| 2.1 | Rodada de ~1 s | B | Não (mas a demo fica ruim) |
-| 2.2 | `berlin52.tsp` via `TSP_FILE` | B | Não |
-| 2.3 | Roteiro de failover | C | Não |
-| 2.4 | Revisar `BullyElection` | C | Não (arguição) |
+| 1.2 | Ensaio mínimo em **2** máquinas | A | Não — recomendado (precisa de 2 notebooks) |
+| 2.1 | Rodada de ~1 s | B | **Feito** (`ITERATIONS_PER_ROUND`) |
+| 2.2 | `berlin52.tsp` via `TSP_FILE` | B | **Feito** (chega ao ótimo 7542) |
+| 2.3 | Roteiro de failover | C | **Feito** (`docs/LAN.md` §3.1, cronometrado) |
+| 2.4 | Revisar `BullyElection` | C | Material pronto; falta C estudar (arguição) |
 | 3.x | Relatório SBC | todos | **Sim** |
 
 ## 0. O que já está pronto (não refazer)
 
 - Núcleo distribuído: gRPC + streaming de feromônio, eleição Bully com detector de líder,
   relógio de Lamport, Ricart-Agrawala, formigas/rodadas, réplica da matriz de feromônio.
-- **40 testes verdes** em 11 classes (`mvn test` no container, 28/10): `RicartAgrawalaTest` (11),
-  `RicartAgrawalaSafetyTest` (1), `NodeConfigTest` (6), `TspInstanceTest` (6), `PheromoneMatrixTest` (4),
+- **43 testes verdes** em 12 classes (`mvn test`, 01/11): `RicartAgrawalaTest` (11),
+  `RicartAgrawalaSafetyTest` (1), `NodeConfigTest` (7), `TspInstanceTest` (6), `PheromoneMatrixTest` (4),
   `ClusterIntegrationTest` (4), `BullyElectionTest` (3), `LamportClockTest` (2), `AntColonyTest` (1),
-  `RoundWorkerTest` (1), `HandshakeTest` (1).
+  `RoundWorkerTest` (2), `HandshakeTest` (1), `BroadcastPheromoneTest` (1).
 - Ensaio local que imita LAN: `docker-compose.lan.yml` (IPs fixos), timeouts por env,
   barreira `PEER_WAIT_MS`, broadcast que pula peer morto.
 - Handshake de configuração no startup (token, remetente e conjunto `{self} ∪ PEERS`).
@@ -120,9 +122,20 @@ registrar o diagnóstico e seguir com a evidência Docker — **não é bloquead
 
 ## 2. Ajustes técnicos antes da demo
 
-### 2.1 Rodada de ~1 s (hoje ~70 ms)
+### 2.1 Rodada de ~1 s (era ~70 ms)
 
-- [ ] **Ler o tempo real e ajustar.**
+- [x] **Feito em 01/11.** Variável nova `ITERATIONS_PER_ROUND` (padrão 1, opção 3 abaixo): repete o lote
+  de formigas sobre o mesmo snapshot e fica com a melhor rota; rede e SC continuam 1× por rodada.
+  Medido com 4 nós numa máquina de 16 núcleos, berlin52, 40 formigas (mediana por rodada):
+  1 → 65 ms · 20 → 76 ms · 300 → 387 ms · **1000 → 943 ms** (mín. 843, máx. 1357).
+  Em 4 máquinas cada nó tem a CPU inteira: **meça de novo** no ensaio físico e ajuste.
+  Uso: `ITERATIONS_PER_ROUND=1000` (compose/`.env`) ou `./tp up -i 1000`. Documentado em
+  `README`, `ARQUITETURA` §8, `docs/classes/config.md` e `docs/guia-de-execucao.md`.
+  Testes: `NodeConfigTest.iteracoesPorRodadaPadraoEhUmEZeroEhRejeitado` e
+  `RoundWorkerTest.maisIteracoesPorRodadaNuncaPioramARotaLocal`.
+
+<details><summary>Análise original</summary>
+
 
 Medir: `docker compose -f docker-compose.lan.yml logs | grep "rodada .* concluída"` (ou o
 timestamp de `Rodada N: melhor local` / `SAIU da seção crítica`).
@@ -139,9 +152,13 @@ Opções, da menos para a mais invasiva:
 fixo em `RoundCoordinator.ROUND_TIMEOUT_MS`, então 1 s por rodada dá folga de 30×), e
 `README`/`ARQUITETURA` §8 documentando a variável nova.
 
+</details>
+
 ### 2.2 Instância TSPLIB (`berlin52.tsp`)
 
-- [ ] **Baixar e versionar a instância (ou documentar o download).**
+- [x] **Feito em 01/11.** `data/berlin52.tsp` versionado (origem e ótimo em `data/README.md`).
+  4 nós, 20–30 rodadas: melhor rota **7542 = ótimo conhecido** em todos. Os dois compose aceitam
+  `TSP_FILE=/app/data/berlin52.tsp` do ambiente/`.env` (a imagem já copia `data/`).
 
 `data/` só tem `README.md`. Baixar `berlin52.tsp` do TSPLIB, colocar em `data/` e conferir que
 `TspInstance` lê `EDGE_WEIGHT_TYPE: EUC_2D` (o parser vem do branch `entrega1/validacoes`, item 1.1 —
@@ -156,7 +173,10 @@ comparável ao ótimo conhecido (7542 para `berlin52`, como sanity check, não c
 
 ### 2.3 Roteiro de demo do failover
 
-- [ ] **Ensaiar e escrever em 5 linhas o que a banca vai ver.**
+- [x] **Feito em 01/11:** roteiro cronometrado em [`docs/LAN.md` §3.1](docs/LAN.md). O ensaio revelou
+  que a 1ª rodada depois da queda levava **15,6 s** (broadcast esperando o líder morto dentro da SC);
+  corrigido (F14 em `docs/AUDITORIA.md`), agora **0,56 s**. Tempos no perfil LAN: `Novo líder: N3`
+  em ~10 s, rodada 12 começa em ~12 s. Falta só **ensaiar a fala** (C).
 
 Cena: cluster rodando → `docker compose stop node4` (ou fechar a máquina) → em ~5 s os logs mostram
 `Líder N4 não responde há 3 heartbeats` e `Novo líder: N3`; a rodada seguinte sai com `[1, 2, 3]`
@@ -168,7 +188,9 @@ o tempo esperado de cada passo.
 
 ### 2.4 Revisar `BullyElection` (arguição)
 
-- [ ] **Ler `election/` inteiro e conseguir explicar sem tela.**
+- [ ] **Ler `election/` inteiro e conseguir explicar sem tela.** Material pronto em
+  `docs/algoritmos/bully.md` §9 — incluídas as respostas para "dois nós iniciam eleição ao mesmo
+  tempo" (Q9) e "por que eleição e detector são separados" (Q10). Falta C estudar.
 
 Pontos que a banca costuma cobrar: quem dispara a eleição, o que acontece com id maior/menor,
 o que é `LeaderMonitor` (3 heartbeats) e por que eleição e detector são separados.
@@ -192,11 +214,8 @@ mesmo tempo?".
 
 ## 4. Higiene da entrega
 
-- [ ] **Push da `main`:** ela está **8 commits à frente de `origin/main`** (LAN + `entrega1/validacoes` +
-  `entrega1/pendencias` + os 2 merges). Os branches já foram mesclados e podem ser apagados depois.
-  ```bash
-  git push origin main
-  ```
+- [x] **Push da `main`:** feito (`origin/main` em `4591109`); `entrega1/implementacao` e
+  `entrega1/validacoes` já apagados no GitHub.
 - [x] Merge de `entrega1/validacoes` (`3290e09`) e de `entrega1/pendencias` (`56e5955`) na `main`.
 - [ ] Confirmar **mesmo commit** em todas as máquinas do ensaio (`git rev-parse --short HEAD`).
 - [ ] `git status` limpo em cada máquina; `dependency-reduced-pom.xml` e `target/` já estão ignorados.

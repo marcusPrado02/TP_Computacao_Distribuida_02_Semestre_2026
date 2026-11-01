@@ -142,6 +142,7 @@ Ver a tabela completa em [`ARQUITETURA.md` §8](ARQUITETURA.md#8-parâmetros). O
 |---|---|
 | `ROUNDS` | quantas rodadas o líder dispara |
 | `ANTS` | formigas por nó por rodada (mais = rodada mais lenta e melhor) |
+| `ITERATIONS_PER_ROUND` | lotes de formigas por rodada (padrão 1); para a demo, ~1000 com berlin52 ≈ 1 s/rodada (`./tp up -i 1000`) |
 | `TSP_CITIES` / `TSP_FILE` | tamanho da instância (mais cidades = rodada mais lenta) |
 | `START_DELAY_MS` | espera do líder antes da 1ª rodada (dá tempo dos nós subirem) |
 
@@ -155,4 +156,4 @@ Ver a tabela completa em [`ARQUITETURA.md` §8](ARQUITETURA.md#8-parâmetros). O
 | Todos os peers `UNAVAILABLE` | firewall, IP errado ou porta diferente | `nc -zv <ip> 50051` a partir da outra máquina |
 | Peers `UNAUTHENTICATED` | tokens diferentes | use o mesmo `CLUSTER_TOKEN` em todos |
 | `Matriz com tamanho X, esperado Y` | instâncias TSP diferentes | mesmos `TSP_CITIES`/`TSP_SEED` ou `TSP_FILE` |
-| Rodadas rápidas demais para ver algo | instância pequena | aumente `ANTS`/`TSP_CITIES` ou use `berlin52.tsp` |
+| Rodadas rápidas demais para ver algo | instância pequena | `ITERATIONS_PER_ROUND=1000` (ou `./tp up -i 1000`) |
