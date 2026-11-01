@@ -9,6 +9,7 @@ Colônia de Formigas (ACO) resolvendo o Caixeiro-Viajante em vários nós Java q
 - Arquitetura e decisões: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md)
 - Enunciado do trabalho: [`docs/ENUNCIADO.md`](docs/ENUNCIADO.md)
 - Plano e divisão de tarefas: [`TODO.md`](TODO.md)
+- **Arguição: quem responde o quê (fatias, demos, perguntas):** [`docs/ARGUICAO.md`](docs/ARGUICAO.md)
 - **Rodar em máquinas físicas (roteiro + checklist):** [`docs/LAN.md`](docs/LAN.md)
 
 ## Requisitos

@@ -316,7 +316,7 @@ demo_failover() {
   local t0=$SECONDS
   cmd_kill "$NODES"
   wait_until 30 "nova eleição" all_alive_see_leader "$((NODES - 1))"
-  ok "Novo líder: N$((NODES - 1)) em ~$((SECONDS - t0)) s (3 heartbeats perdidos + eleição)"
+  ok "Novo líder: N$((NODES - 1)) em ~$((SECONDS - t0)) s (5 heartbeats perdidos + eleição)"
   printf '\n%sEventos de eleição (ordem de Lamport):%s\n' "$B" "$RST"
   cmd_timeline eleicao | tail -15
   printf '\n'; info "Religando N$NODES: ele deve vencer de novo (maior id)"
