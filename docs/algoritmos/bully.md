@@ -235,3 +235,15 @@ de líder antigo), refazer a rodada interrompida e heartbeat também entre segui
    partição. O sistema converge quando o COORDINATOR do maior chega.
 8. **O que o líder faz de diferente?** Só coordena rodadas (`RoundCoordinator`); também roda formigas
    como trabalhador.
+9. **E se dois nós iniciarem eleição ao mesmo tempo?** Não há problema: cada um manda ELECTION só
+   para ids maiores. Quem recebe responde OK e, por `startElection()`, entra na própria eleição — mas
+   no máximo uma por nó (`electing.compareAndSet`), então eleições concorrentes **se fundem** em vez
+   de se multiplicarem. Todas sobem até o maior vivo, que não recebe OK de ninguém e anuncia
+   COORDINATOR. Quem recebeu OK espera esse anúncio (`awaitCoordinator`); `setLeader` usa
+   `getAndSet`, então COORDINATORs repetidos notificam os listeners uma vez só. O ensaio de failover
+   mostra exatamente isso: N1, N2 e N3 detectam a queda com ~70 ms de diferença e o resultado é um único
+   `Novo líder: N3` (`docs/LAN.md` §3.1).
+10. **Por que eleição e detector são classes separadas?** `BullyElection` só sabe *escolher* um líder;
+    `LeaderMonitor` só sabe *suspeitar* do líder (heartbeat). Separados, dá para testar a eleição
+    com transporte falso (`BullyElectionTest`) e trocar a política de detecção (timeout, número de
+    faltas) sem mexer no algoritmo.

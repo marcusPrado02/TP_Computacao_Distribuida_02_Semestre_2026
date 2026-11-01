@@ -13,10 +13,14 @@ x-env: &env
   TSP_SEED: "42"
   ROUNDS: "30"
   ANTS: "40"
+  # Lotes de formigas por rodada: só alonga a parte local. Demo do failover: ~1000 com berlin52
+  # deixa a rodada em ~1 s (medido com 4 nós numa máquina de 16 núcleos; meça a sua, PENDENCIAS 2.1).
+  ITERATIONS_PER_ROUND: "${ITERATIONS_PER_ROUND:-1}"
+  # Instância TSPLIB embutida na imagem (COPY data). Vazio = aleatória com TSP_CITIES/TSP_SEED.
+  TSP_FILE: "${TSP_FILE:-}"
   START_DELAY_MS: "5000"
   # Barreira: o líder só começa a rodada 1 quando todos os peers responderem.
   PEER_WAIT_MS: "30000"
-  # TSP_FILE: "/app/data/berlin52.tsp"
 
 services:
   node1:

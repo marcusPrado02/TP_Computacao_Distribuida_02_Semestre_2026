@@ -12,7 +12,10 @@ Cada pessoa é dona de um módulo e precisa conseguir explicá-lo na arguição.
 | C | Eleição de líder (Bully) + detector de falha | `election/` |
 | D | Relógio de Lamport + Ricart-Agrawala | `clock/`, `mutex/` |
 
-> Preencher os nomes: A = ____, B = ____, C = ____, D = ____
+Integrantes: Marcus Prado Silva, Pedro Henrique Vilaça Valverde, Gabriel Batista de Almeida,
+Eduardo Alves Salgado Lisboa Oliveira.
+
+> Preencher quem é quem: A = ____, B = ____, C = ____, D = ____
 
 ## Semana 1 — entender e fechar o núcleo
 - [ ] Todos: ler `docs/ARQUITETURA.md`, rodar testes e cluster **só com Docker** (sem Java/Maven no host):
@@ -21,12 +24,12 @@ Cada pessoa é dona de um módulo e precisa conseguir explicá-lo na arguição.
 - [x] A: ensaio local com IPs fixos (`docker-compose.lan.yml`), barreira de subida (`PEER_WAIT_MS`)
   e timeouts de LAN
 - [ ] A: validar build + compose em pelo menos 2 máquinas do grupo — roteiro em `docs/LAN.md`
-- [ ] B: baixar `berlin52.tsp` (TSPLIB) para `data/` e testar com `TSP_FILE`
+- [x] B: baixar `berlin52.tsp` (TSPLIB) para `data/` e testar com `TSP_FILE` (chega ao ótimo 7542)
 - [ ] C: revisar `BullyElection` e explicar o fluxo ao grupo
 
 ## Semana 2 — robustez e demo
-- [ ] B: ajustar instância/parâmetros para cada rodada durar ~1 s (hoje, com 60 cidades, ~70 ms é rápido demais para demonstrar falha)
-- [ ] C: roteiro de demo do failover (`docker compose stop node4` → N3 assume)
+- [x] B: ajustar instância/parâmetros para cada rodada durar ~1 s → `ITERATIONS_PER_ROUND=1000` (~0,94 s; remedir na LAN)
+- [x] C: roteiro de demo do failover (`docker compose stop node4` → N3 assume) → `docs/LAN.md` §3.1
 - [x] D: teste mostrando que sem mutex as réplicas divergem (argumento para o relatório) → `PheromoneMatrixTest`
 - [ ] A: rodar 4 nós em 4 máquinas na LAN e registrar prints/logs — evidências listadas em `docs/LAN.md` §3
 

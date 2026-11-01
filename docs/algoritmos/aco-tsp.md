@@ -138,6 +138,7 @@ rodadas sejam dominadas por τ inicial muito alto (exploração lenta) ou muito 
 | `BETA` (β) | 3.0 | mais guloso (prefere arestas curtas); β=0 ignora distâncias |
 | `RHO` (ρ) | 0.1 | esquece mais rápido; ρ alto = pouca memória, ρ baixo = convergência lenta |
 | `ANTS` | 40 | mais formigas por nó por rodada: melhor amostragem, mais CPU por rodada |
+| `ITERATIONS_PER_ROUND` | 1 | repete o lote de formigas N vezes sobre o mesmo snapshot e fica com a melhor rota; só alonga a parte local (demo) |
 | `ROUNDS` | 30 | mais iterações globais |
 
 Com 4 nós e `ANTS=40`, cada rodada global tem 160 formigas no total.

@@ -22,6 +22,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -239,8 +240,14 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
      * Envia a matriz a todos os peers e espera as confirmações (chamado dentro da seção crítica).
      *
      * <p>Esperar os acks antes de sair da seção crítica garante que o próximo nó a entrar já tem
-     * a matriz atualizada. Os envios são paralelos, então o tempo é o do peer mais lento —
-     * exceto peers em quarentena, que são pulados (o coordenador é sempre tentado).
+     * a matriz atualizada. Os envios são paralelos, então o tempo é o do peer vivo mais lento.
+     *
+     * <p>Só se esperam os peers vivos. Peer já marcado como inacessível recebe o envio em segundo
+     * plano, fora da espera: se morreu, não segura a SC pelo timeout inteiro a cada fim de
+     * quarentena; se voltou, o próprio envio o marca como vivo e ele volta a ser esperado. Em
+     * quarentena ele nem é tentado, exceto o coordenador da rodada, que precisa da matriz e por
+     * isso é sempre tentado (mas, morto, também não é esperado: líder que cai no meio da rodada
+     * faria cada nó da fila ficar o timeout inteiro na SC, atrasando a 1ª rodada do novo líder).
      */
     public void broadcastPheromone(int round, double[] tau, Tour best, int coordinator) {
         PheromoneUpdate base = PheromoneUpdate.newBuilder()
@@ -249,14 +256,14 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
                 .addAllBestTour(Protos.boxed(best.cities()))
                 .setBestLength(best.length())
                 .build();
-        List<Future<Boolean>> pending = stubs.keySet().stream()
-                // Peer morto não pode custar o broadcast inteiro dentro da seção crítica em toda
-                // rodada. O coordenador é a exceção: ele precisa da matriz para a próxima rodada,
-                // então vale a pena tentar mesmo se estiver em quarentena.
-                .filter(id -> id == coordinator || shouldContact(id))
-                .map(id -> executor.submit(() -> ack(id, broadcastTimeoutMs,
-                        s -> s.updatePheromone(base.toBuilder().setHeader(header()).build()))))
-                .toList();
+        List<Future<Boolean>> pending = new ArrayList<>();
+        for (int id : stubs.keySet()) {
+            boolean mustWait = alive.contains(id);
+            if (!mustWait && id != coordinator && !shouldContact(id)) continue;
+            Future<Boolean> sent = executor.submit(() -> ack(id, broadcastTimeoutMs,
+                    s -> s.updatePheromone(base.toBuilder().setHeader(header()).build())));
+            if (mustWait) pending.add(sent);
+        }
         for (Future<Boolean> f : pending) {
             try {
                 f.get();

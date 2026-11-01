@@ -115,7 +115,11 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 - O líder usa heartbeat como *probe* dos participantes pendentes a cada 500 ms. Sem isso, um
   seguidor que morre depois do `StartRound` custava os 30 s do timeout da rodada.
 - O broadcast da matriz é **síncrono dentro da SC**: quem entra depois vê a matriz mais recente.
-  O coordenador é sempre contatado, mesmo em quarentena, porque é ele que precisa da matriz.
+  Só os peers **vivos** são esperados: peer já marcado como inacessível recebe a matriz em segundo
+  plano (sem segurar a SC). O coordenador é sempre tentado, mesmo em quarentena, porque precisa da
+  matriz — mas, se estiver morto, também não é esperado. Sem isso, líder que cai no meio da rodada
+  fazia cada nó da fila passar `BROADCAST_TIMEOUT_MS` inteiro na SC (no perfil LAN, 1ª rodada do
+  novo líder em ~15 s; agora ~0,6 s — `BroadcastPheromoneTest`).
 
 **Atenção:** uma falha de REQUEST conta como permissão. Se o peer estava apenas lento, isso viola a
 exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não tolerante a partições.
@@ -150,7 +154,8 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
   depois) também pode aplicar uma matriz antiga por cima de uma nova. Precisa de epoch/versão e
   reconciliação.
 - **Peer em quarentena pulado no broadcast perde aquela atualização.** O coordenador é sempre
-  tentado; os demais convergem na próxima atualização. Se o peer só estava lento, fica com a réplica
+  tentado (sem ser esperado se estiver morto); os demais convergem na próxima atualização. Envios
+  em segundo plano para peer dado como morto podem chegar fora de ordem (ver "Réplicas sem versão"). Se o peer só estava lento, fica com a réplica
   atrasada por uma rodada.
 - **Estado de rodada só em memória.** Um líder que reinicia volta a `lastRound = 0`, recomeça em
   `1/ROUNDS` e retransmite a matriz inicial. O `RoundWorker` ignora rodadas repetidas (não refaz a
@@ -200,6 +205,7 @@ Total: 40 testes (`mvn test` no container, ~9 s).
 | `TSP_FILE` | — | arquivo TSPLIB (sobrepõe `TSP_CITIES`) |
 | `TSP_CITIES` / `TSP_SEED` | 60 / 42 | instância aleatória (igual em todos os nós) |
 | `ROUNDS` / `ANTS` | 30 / 40 | rodadas totais / formigas por nó por rodada |
+| `ITERATIONS_PER_ROUND` | 1 | lotes de `ANTS` formigas por nó por rodada, sobre o mesmo snapshot (fica a melhor rota). Só alonga a parte local; rede e SC continuam 1× por rodada. Demo: ~1000 com berlin52 ≈ 1 s/rodada |
 | `ALPHA` / `BETA` / `RHO` | 1.0 / 3.0 / 0.1 | parâmetros ACO |
 | `START_DELAY_MS` | 5000 | espera do líder antes da 1ª rodada |
 | `RPC_TIMEOUT_MS` | 500 | deadline das chamadas curtas (LAN: 1500); heartbeat usa `max(1000, RPC_TIMEOUT_MS)` |
