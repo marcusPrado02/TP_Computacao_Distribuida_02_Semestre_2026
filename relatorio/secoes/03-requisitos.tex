@@ -1,95 +1,39 @@
 \section{Requisitos Implementados}
 
-% ======================= ROTEIRO COMPLETO =======================
-% SEÇÃO 3 — orçamento: 20 a 22 linhas de texto (4 subseções, ~5 linhas cada)
-% + Figura 2. O enunciado pede NO MÍNIMO DOIS requisitos; entregamos quatro.
-% Cada subseção = 1 parágrafo (ou 2 curtos). Formato: o que o algoritmo faz ->
-% as mensagens -> UMA decisão de projeto que vocês tomaram.
-%
-% [3.1 gRPC]  ~5 linhas
-%   FATOS: oito RPCs unários em um serviço só (node.proto:14-36), sem streaming.
-%   Deadline em toda chamada, configurável por ambiente: RPC_TIMEOUT_MS (500 ms
-%   no loopback, 1500 na LAN), BROADCAST_TIMEOUT_MS (2000/5000) e
-%   COORDINATOR_TIMEOUT_MS (3000/8000) — NodeConfig.java:97; docs/LAN.md §5.
-%   Autenticação em duas camadas: interceptor exige "x-cluster-token" e devolve
-%   UNAUTHENTICATED; o serviço recusa sender_id fora de PEERS com
-%   PERMISSION_DENIED (ClusterAuth.java:15-46; NodeServiceImpl.java:141).
-%   DECISÃO a contar: limite de 64 MiB por mensagem (PeerNetwork.java:72). O
-%   padrão do gRPC (4 MiB) estourava a matriz a partir de ~725 cidades e o peer
-%   era marcado como morto (F8). Não há chunking — acima de ~2900 cidades falha.
-%   Frase-alvo: "o tamanho da mensagem foi o primeiro parâmetro que a matriz de
-%   feromônio forçou a mudar".
-%
-% [3.2 Bully]  ~6 linhas
-%   FATOS, na ordem:
-%   - três passos: ELECTION só para ids MAIORES; se ninguém responde OK, o nó se
-%     declara líder e envia COORDINATOR a todos; se alguém responde OK, espera o
-%     COORDINATOR por 3 s e recomeça (BullyElection.java:72-111).
-%   - quem recebe ELECTION de id menor responde OK e inicia a própria eleição:
-%     a candidatura "sobe" até o maior nó vivo (BullyElection.java:124-128).
-%   - COORDINATOR de id menor é contestado (BullyElection.java:131-142): cobre o
-%     caso de nó que subiu depois e se achou líder sozinho.
-%   - detecção separada: heartbeat de 1 s; 5 faltas seguidas disparam eleição
-%     (LeaderMonitor.java:21,37,63). Por que 5 e não 1: um timeout isolado pode
-%     ser pausa de GC ou pico de rede; eleger à toa custa uma rodada.
-%   NÚMEROS medidos: no perfil LAN, `Novo líder` em ~10 s (5 x 1,5 s de heartbeat
-%   + eleição); no compose de loopback, ~5 s. Failover: ver Tabela 2.
-%   Frase-alvo: "o detector não distingue lento de morto; o preço dessa escolha
-%   é o tempo de detecção".
-%
-% [3.3 Lamport]  ~4 linhas
-%   FATOS: evento local e envio fazem tick(); recebimento faz
-%   max(local, remoto) + 1 (LamportClock.java:18-24).
-%   DOIS USOS concretos: (a) ordenar os pedidos de seção crítica — é o primeiro
-%   componente do par (timestamp, id); (b) numerar os logs com [L=...], o que
-%   deixa reconstruir a ordem causal de uma execução.
-%   DECISÃO a justificar: não usamos relógio físico. As máquinas não têm
-%   GPS/PTP, e para decidir quem espera basta ordem causal — o instante exato
-%   não muda a decisão.
-%   Frase-alvo: "o relógio de Lamport não mede tempo: ele ordena eventos".
-%
-% [3.4 Ricart-Agrawala]  ~6 linhas
-%   FATOS:
-%   - estados RELEASED / WANTED / HELD (RicartAgrawala.java:36); ao pedir, o nó
-%     congela um timestamp e envia REQUEST a todos os outros.
-%   - prioridade pelo par (request_ts, id): menor entra primeiro; empate no
-%     timestamp é desempatado pelo id.
-%   - o REPLY carrega o request_ts que está autorizando (node.proto:79-83);
-%     REPLY de pedido antigo é descartado, então uma permissão atrasada não vale
-%     para um pedido futuro (RicartAgrawala.java:138).
-%   - custo 2(N-1) mensagens por entrada na seção crítica.
-%   - tolerância: pedido reenviado a cada 500 ms (LIVENESS_POLL_MS, linha 39) e
-%     peer que deixou de estar vivo não é mais aguardado (linhas 93-99).
-%   CONSEQUÊNCIA a admitir: falha conta como permissão, então dois nós podem
-%   entrar juntos se um só estava lento. É limitação assumida — vira o desafio
-%   principal da §5, não um bug escondido.
-%   ARGUMENTO DE PROJETO (usar o teste): sem exclusão, duas escritas concorrentes
-%   na matriz perdem atualização e as réplicas divergem (PheromoneMatrixTest);
-%   com exclusão, as matrizes terminam idênticas nos 4 nós
-%   (ClusterIntegrationTest).
-% ===============================================================
-
 \subsection{RPC -- gRPC}
-% src/main/proto/node.proto, rpc/PeerNetwork.java, rpc/NodeServiceImpl.java, rpc/ClusterAuth.java
-\pendente{8 RPCs un\'arios; deadlines por ambiente; token no interceptor + sender\_id em PEERS; 64 MiB}
+
+Usamos oito RPCs unários em um serviço, sem \textit{streaming}. Toda chamada tem prazo
+configurável: 500 ms para mensagens de controle no \textit{loopback} e 1500 ms em rede local, com
+prazos maiores para o \textit{broadcast} e para a espera do \texttt{COORDINATOR}. O interceptor
+exige o token do \textit{cluster} (\texttt{UNAUTHENTICATED}) e o serviço recusa remetente fora de
+\texttt{PEERS} (\texttt{PERMISSION\_DENIED}). A decisão mais visível foi o limite de 64 MiB por
+mensagem: o padrão de 4 MiB estourava a matriz a partir de cerca de 725 cidades e o \textit{peer}
+era marcado como morto.
 
 \subsection{Elei\c{c}\~ao de l\'ider -- Bully}
-% election/BullyElection.java, election/LeaderMonitor.java, docs/algoritmos/bully.md
-\pendente{3 passos; maior id vence; contesta\c{c}\~ao de COORDINATOR menor; detector separado, 5 heartbeats; \~10 s}
+
+A eleição~\cite{garcia82} segue três passos: \texttt{ELECTION} só aos identificadores maiores; se
+ninguém responde OK, o nó se declara líder e envia \texttt{COORDINATOR}; se alguém responde, espera
+o \texttt{COORDINATOR} por 3 s e recomeça. Quem recebe \texttt{ELECTION} de identificador menor
+responde OK e inicia a própria eleição, e um \texttt{COORDINATOR} menor é contestado, o que
+restabelece o invariante quando um nó sobe depois. A detecção é separada: \textit{heartbeat} de 1 s
+e cinco faltas, para não eleger por uma pausa de GC; o preço é a latência, cerca de 8,5 s no perfil
+local, com aproximadamente 10 s até o anúncio do novo líder.
 
 \subsection{Rel\'ogio l\'ogico -- Lamport}
-% clock/LamportClock.java, docs/algoritmos/lamport.md
-\pendente{tick no envio, max+1 no recebimento; ordena pedidos de SC e numera os logs; por que n\~ao rel\'ogio f\'isico}
+
+O relógio lógico~\cite{lamport78} incrementa em eventos locais e em envios e, ao receber uma
+mensagem, assume o maior valor entre o local e o recebido, somado de um. Ele ordena os pedidos de
+seção crítica --- o carimbo é o primeiro componente do par de prioridade --- e numera as linhas de
+log, o que permite reconstruir a ordem causal de uma execução. Não usamos relógio físico: as
+máquinas não têm GPS nem PTP e, para decidir quem espera, basta a ordem causal.
 
 \subsection{Exclus\~ao m\'utua -- Ricart-Agrawala}
-% mutex/RicartAgrawala.java, docs/algoritmos/ricart-agrawala.md
-\pendente{RELEASED/WANTED/HELD; prioridade (ts, id); REPLY carrega request\_ts; 2(N-1); reenvio a cada 500 ms; falha = permiss\~ao}
 
-\begin{figure}[t]
-  \centering
-  \scalebox{0.85}{\input{figuras/sequencia-ra}}
-  \caption{Ricart-Agrawala com tr\^es participantes: N1 s\'o entra na se\c{c}\~ao cr\'itica depois
-  de receber as duas permiss\~oes. O par $(ts, id)$ decide quem espera: um pedido mais novo pode
-  ser adiado e respondido s\'o na sa\'ida da se\c{c}\~ao cr\'itica.}
-  \label{fig:ra}
-\end{figure}
+Cada nó está fora da seção crítica, querendo entrar ou dentro dela. Ao pedir, congela um carimbo
+de Lamport e envia \texttt{REQUEST} a todos~\cite{ricart81}; a prioridade é o par (carimbo,
+identificador). O \texttt{REPLY} carrega o carimbo do pedido que autoriza, então uma permissão
+atrasada não vale para um pedido futuro, e o custo é $2(N-1)$ mensagens por entrada. Para não
+travar, o pedido é reenviado a cada 500 ms e um \textit{peer} que deixou de estar vivo não é
+aguardado --- logo, a falha conta como permissão e dois nós podem entrar juntos se um apenas
+estiver lento. Assumimos esse risco; ele é discutido na Seção~5.

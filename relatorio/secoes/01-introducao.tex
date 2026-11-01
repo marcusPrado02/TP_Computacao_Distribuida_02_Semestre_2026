@@ -1,53 +1,20 @@
 \section{Introdu\c{c}\~ao}
 
-% ======================= ROTEIRO COMPLETO =======================
-% SEÇÃO 1 — orçamento: 10 linhas (4 parágrafos: 2 + 3 + 3 + 2).
-% Cada bloco [P*] vira UM parágrafo. Escreva em prosa os fatos listados,
-% nesta ordem. Não acrescente fato sem fonte. Ao terminar: apague este bloco
-% e o \pendente correspondente.
-%
-% [P1] O problema. (~2 linhas)
-%   FATOS: o caixeiro-viajante pede o ciclo mais curto que visita cada cidade
-%   exatamente uma vez e volta à origem; é NP-difícil, então instâncias reais
-%   são atacadas por heurística, não por força bruta.
-%   NÚMEROS: usamos berlin52 (52 cidades, ótimo conhecido 7542) e uma instância
-%   aleatória de 60 cidades; ambas com distância euclidiana.
-%   FONTE: docs/algoritmos/aco-tsp.md §1; data/README.md.
-%   EVITAR: história do problema, definição formal de grafo, notação matemática.
-%
-% [P2] Por que distribuir. (~3 linhas)
-%   FATOS: na colônia de formigas cada formiga é independente — ela só lê a
-%   matriz de feromônio no início do passeio e devolve uma rota. Logo o custo
-%   computacional (o "passeio" de cada formiga) divide quase linearmente entre
-%   nós, e o único estado compartilhado é a matriz n x n.
-%   CONSEQUÊNCIA a dizer: o acoplamento entre nós é pequeno e bem delimitado —
-%   por isso o problema é bom para mostrar coordenação distribuída.
-%   FONTE: docs/algoritmos/aco-tsp.md §2-3; src/.../aco/AntColony.java.
-%   EVITAR: afirmar speedup medido (não medimos 1 x N nós; ver §4).
-%
-% [P3] O que foi construído. (~3 linhas)
-%   FATOS: cluster em Java 21 com comunicação por gRPC; N nós simétricos (mesmo
-%   binário; o papel vem da eleição); líder eleito por Bully dispara rodadas;
-%   cada nó roda um lote de formigas, entra na seção crítica, atualiza e propaga
-%   a matriz de feromônio; réplica da matriz em memória, sem banco de dados;
-%   roda em Docker Compose e em máquinas separadas na mesma LAN.
-%   NÚMEROS: 43 testes automatizados, 4 nós no ensaio; melhor rota em berlin52
-%   = 7542 (o ótimo).
-%   FONTE: README.md; docs/ARQUITETURA.md §1; docs/LAN.md; §4 deste relatório.
-%
-% [P4] Requisitos e organização. (~2 linhas)
-%   FATOS: o enunciado exige no mínimo dois itens da lista; implementamos
-%   QUATRO: RPC/gRPC, relógio lógico de Lamport, eleição de líder (Bully) e
-%   exclusão mútua (Ricart-Agrawala).
-%   Frase-alvo: "Optamos por implementar quatro requisitos, e não o mínimo de dois."
-%   Última frase: mapa do artigo (§2 arquitetura, §3 requisitos, §4 resultados,
-%   §5 desafios, §6 papéis).
-% ===============================================================
+O problema do caixeiro-viajante (TSP) pede o ciclo de menor comprimento que visite cada cidade uma
+vez e retorne à origem; por ser NP-difícil, instâncias práticas são atacadas por heurísticas.
+Usamos \textit{berlin52}, da TSPLIB~\cite{reinelt91} (52 cidades, ótimo 7542), e uma instância
+aleatória de 60 cidades, ambas com distâncias euclidianas.
 
-\pendente{problema: TSP, berlin52 e por que heurística}
+A colônia de formigas (ACO)~\cite{dorigo97} se distribui bem porque cada formiga é independente: lê
+a matriz de feromônio no início do passeio e devolve uma rota. O custo divide-se quase linearmente
+entre os nós, e o único estado compartilhado é a matriz $n \times n$ --- um acoplamento pequeno e
+bem delimitado, adequado para estudar coordenação.
 
-\pendente{por que distribuir: formigas independentes, único acoplamento é a matriz}
+Construímos um \textit{cluster} em Java 21 com gRPC. Todos executam o mesmo binário, e o papel de
+líder ou trabalhador vem da eleição, não da configuração. Cada nó roda um lote de formigas, entra
+na seção crítica para atualizar e propagar a matriz e informa sua melhor rota ao coordenador; a
+matriz é replicada em memória e o sistema roda em contêineres ou em máquinas da mesma rede local.
 
-\pendente{o que foi construído: Java 21 + gRPC, líder eleito, matriz replicada}
-
-\pendente{4 requisitos atendidos (o enunciado exige 2) e a organização do artigo}
+O enunciado exige dois requisitos; implementamos quatro: gRPC, relógio de Lamport, eleição por
+Bully e exclusão mútua por Ricart-Agrawala. As Seções~2 a 6 trazem arquitetura, requisitos,
+resultados, problemas e papéis.

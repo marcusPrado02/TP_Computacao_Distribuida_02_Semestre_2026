@@ -9,7 +9,8 @@
 > [`docs/LAN.md`](docs/LAN.md).
 
 **Resumo (01/11):** 0 bloqueadores técnicos. Falta: ensaio físico em 2 máquinas (1.2, recomendado),
-estudo do Bully por C (2.4, material pronto), o **texto** do relatório (§3) e o push da `main`.
+estudo do Bully por C (2.4, material pronto), **reescrever o texto do relatório** (R6 — ver o aviso
+na §3) e o push da `main`.
 
 | # | Item | Dono (TODO.md) | Bloqueia a entrega? |
 |---|---|---|---|
@@ -205,46 +206,42 @@ mesmo tempo?".
 
 ## 3. Relatório (template SBC, até 4 páginas)
 
-**Andaime pronto em `relatorio/`** — compila para `relatorio/main.pdf` (4 páginas com os marcadores;
-~2,2 páginas sem eles, ou seja, sobram ~1,8 páginas para a prosa). Não precisa de TeX no host:
+**Texto completo em `relatorio/`** — compila para `relatorio/main.pdf` em **4 páginas**, com
+1 figura, 1 tabela e 5 referências. Não precisa de TeX no host:
 
 ```bash
 cd relatorio && docker run --rm -v "$PWD":/w -w /w texlive/texlive:latest \
   latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
 ```
 
+> **DECISÃO REGISTRADA (01/11):** o texto foi escrito com assistência de IA a pedido explícito do
+> grupo, que assumiu as consequências. O enunciado (§5.1) diz que texto praticamente gerado de
+> forma automática é **desconsiderado**. Reescrita com palavras próprias é o item R6 abaixo.
+
 - [x] Template SBC vendorizado (`relatorio/sbc-template.sty`) + `main.tex` com a estrutura
-- [x] Título, 4 autores, resumo/abstract e palavras-chave com roteiro
-- [x] Figuras vetoriais em TikZ: arquitetura e sequência do Ricart-Agrawala (`relatorio/figuras/`)
-- [x] Tabela de mensagens (fato, extraído do `node.proto`), tabela de resultados e tabela de papéis
-- [x] 6 referências no formato SBC (`secoes/07-referencias.tex` + `referencias.bib`)
+- [x] Título, 4 autores, resumo (9 linhas) e abstract (8 linhas), ambos abaixo do limite de 10
+- [x] Figuras vetoriais em TikZ: arquitetura (em uso) e sequência do Ricart-Agrawala (guardada)
+- [x] Tabela 1 de resultados e §6 em prosa com a divisão de trabalho
+- [x] 5 referências no formato SBC, todas citadas no texto (TSPLIB, ACO, Garcia-Molina, Lamport,
+  Ricart-Agrawala)
 - [x] `docs/evidencias/README.md` com o que coletar e como nomear
 
 Pendente (o que ainda falta para a entrega):
 
 - [x] **R1 — Autores:** Pedro Henrique Vila\c{c}a Valverde, Marcus Prado Silva,
   Gabriel Batista de Almeida e Eduardo Alves Salgado Lisboa Oliveira (4, dentro do 4–5 do enunciado).
-  O `main.tex` e a Tabela 3 já têm os nomes.
-- [ ] **R1b — Módulo de Gabriel e Eduardo:** a Tabela 3 só tem o "o que fez" de Pedro (LAN/infra,
-  handshake, TSPLIB) e Marcus (Ricart-Agrawala, testes, docs), porque é o que o git comprova.
-  Confirmar quem ficou com B (ACO/rodadas) e C (Bully/detector) e preencher as duas linhas.
+- [ ] **R1b — Divisão em §6:** o texto atribui B (ACO/rodadas) a Gabriel e C (eleição/detector) a
+  Eduardo, seguindo o `TODO.md`. **Confirmar** — é a única atribuição que não vem do git.
 - [ ] **R2 — Data e formato:** confirmar no Canvas o prazo e se é upload de PDF.
-- [x] **R3a — Roteiro completo:** cada `secoes/0X.tex` (e o resumo no `main.tex`) tem um bloco
-  `% ROTEIRO` que cobre **todos** os parágrafos da seção, com: a afirmação do parágrafo, os
-  números/fatos com `arquivo:linha` e o orçamento de linhas. Não sai no PDF (é comentário).
-  Nenhum parágrafo do relatório fica "a inventar": tudo está especificado.
-- [ ] **R3b — Transformar o roteiro em prosa**, uma pessoa por bloco (mapa no `relatorio/README.md`):
-  - [ ] Introdução: problema, ACO/TSP, 4 requisitos atendidos (o enunciado exige 2) — B
-  - [ ] Arquitetura: entidades, mensagens, uma rodada — A
-  - [ ] gRPC + 64 MiB + token — A
-  - [ ] Bully + detector (5 heartbeats) + failover — C
-  - [ ] Lamport + Ricart-Agrawala + `PheromoneMatrixTest` (sem SC as réplicas divergem) — D
-  - [ ] Desafios: F1/F2-F3/F8/F9/F14 de `docs/AUDITORIA.md` (lento × morto é o melhor argumento)
-- [ ] **R4 — Resultados:** a Tabela 2 já está com os números de 01/11 (43 testes, rodada de ~0,85 s
-  com `ITERATIONS_PER_ROUND=1000`, berlin52 no ótimo 7542, failover ~10 s). Falta só decidir se o
-  ensaio de 2 máquinas entra (ver `docs/evidencias/`); se não, remover a frase sobre máquinas físicas.
-- [ ] **R5 — Fechamento:** remover todos os marcadores e os blocos `% ROTEIRO`
-  (`grep -rn "pendente\|ROTEIRO" relatorio/`), conferir ≤4 páginas e revisar o texto (IA só para revisão).
+- [x] **R3 — Texto das seis seções e do resumo/abstract:** escrito, com os números de 01/11.
+- [ ] **R4 — Ensaio de 2 máquinas:** §4 hoje não menciona máquinas físicas (só a legenda da
+  Tabela 1 registra que as medidas foram em 1 máquina com 4 contêineres). Se o ensaio for feito,
+  acrescentar um parágrafo — mas o PDF está em 4 páginas exatas, então algo terá de sair.
+- [x] **R5 — Fechamento técnico:** sem marcadores, sem `Overfull \hbox`, sem citação indefinida,
+  4 páginas.
+- [ ] **R6 — Reescrita (o item que decide a nota):** passar cada seção para as palavras de quem
+  ficou responsável por ela, usando `relatorio/main.pdf` como esqueleto factual. O roteiro de cada
+  seção (fatos + `arquivo:linha`) está no histórico do git (`git show 673da5c:relatorio/secoes/`).
 
 > Lembrete do enunciado: IA só para revisar/corrigir texto. Texto praticamente gerado por IA é desconsiderado.
 

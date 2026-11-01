@@ -1,101 +1,34 @@
 \section{Arquitetura do Sistema}
 
-% ======================= ROTEIRO COMPLETO =======================
-% SEÇÃO 2 — orçamento: 13 linhas de texto + Figura 1 + Tabela 1.
-% Cada bloco [P*] vira UM parágrafo. Ao terminar, apague este bloco.
-%
-% [P1] Visão geral — 1 parágrafo, ~2 linhas (antes da Figura 1).
-%   FATOS: todos os nós executam o MESMO binário; o papel (líder ou trabalhador)
-%   não está na configuração, é decidido em tempo de execução pela eleição.
-%   A configuração só diz quem é o nó (NODE_ID) e quem são os outros (PEERS).
-%   Frase-alvo: "Não existe nó mestre: qualquer nó pode assumir a coordenação."
-%   FONTE: NodeConfig.java:17-40; docs/ARQUITETURA.md §1.
-%   EVITAR: chamar de "servidor" e "cliente" — todos são os dois.
-%
-% [P2] Entidades — 1 parágrafo, ~4 linhas (§2.1).
-%   FATOS, na ordem em que aparecem na Figura 1:
-%   - RoundCoordinator (só no líder): incrementa a rodada, envia StartRound e
-%     espera os RoundDone; timeout de 30 s por rodada (RoundCoordinator.java:34,62-78).
-%   - RoundWorker (TODO nó, inclusive o líder): roda as formigas, entra na seção
-%     crítica, propaga a matriz e responde a quem iniciou a rodada (RoundWorker.java:82-107).
-%   - LeaderMonitor: heartbeat de 1 s no líder; 5 faltas seguidas disparam eleição
-%     (LeaderMonitor.java:21,37,63).
-%   - Suporte: LamportClock, RicartAgrawala, PeerNetwork (lado cliente) e
-%     NodeServiceImpl + ClusterAuth (lado servidor).
-%   PONTO a explicar: o detector é separado do algoritmo de eleição de propósito —
-%   um diz QUANDO desconfiar, o outro decide QUEM assume.
-%
-% [P3] Mensagens — 1 parágrafo, ~3 linhas (§2.2, conversa com a Tabela 1).
-%   FATOS: oito RPCs unários em um único serviço NodeService (node.proto:14-36);
-%   não usamos streaming — toda interação cabe em requisição/resposta.
-%   Todo cabeçalho carrega sender_id e o carimbo de Lamport; o token do cluster
-%   vai no metadata "x-cluster-token" e é conferido por um interceptor ANTES do
-%   handler, que devolve UNAUTHENTICATED (ClusterAuth.java:15-46).
-%   POR QUE UM SERVIÇO ÚNICO: um canal por peer serve eleição, mutex e rodadas;
-%   menos conexões e o mesmo deadline para todos os módulos.
-%   EVITAR: descrever cada RPC de novo (a tabela já faz isso).
-%
-% [P4] Uma rodada — 1 parágrafo, ~4 linhas (§2.3).
-%   FATOS, nesta ordem (é o fluxo que a banca cobra):
-%   1) semente distinta por (nó, rodada): tspSeed*1000003 + round*101 + nodeId
-%      (RoundWorker.java:82) — mesma configuração reproduz a mesma execução;
-%   2) ITERATIONS_PER_ROUND lotes de formigas sobre o MESMO snapshot, ficando com
-%      a melhor rota; a iteração 0 usa a semente original, então o padrão (1)
-%      reproduz o comportamento anterior (RoundWorker.java:88-90);
-%   3) só depois vem o custo distribuído: mutex.acquire() (Ricart-Agrawala),
-%      evaporar + depositar, broadcast síncrono da matriz, release()
-%      (RoundWorker.java:94-105);
-%   4) RoundDone volta para quem enviou o StartRound, não para "o líder"
-%      (RoundWorker.java:116) — se a eleição mudou no meio, a resposta ainda
-%      chega a quem está esperando.
-%   ARGUMENTO DE PROJETO (dizer explicitamente): a parte cara (formigas) roda
-%   fora da seção crítica e em paralelo em todos os nós; dentro dela fica só a
-%   escrita na matriz. E o broadcast espera apenas peers VIVOS: peer morto
-%   recebe em segundo plano, senão um líder caído no meio da rodada faria cada
-%   nó da fila gastar o timeout inteiro na seção crítica (F14, §5).
-%   FONTE: RoundWorker.java:82-107; PeerNetwork.java:240-270.
-% ===============================================================
-
-\pendente{vis\~ao geral: N n\'os sim\'etricos, mesmo bin\'ario, papel definido pela elei\c{c}\~ao}
+Não existe nó mestre: todos executam o mesmo binário, e a configuração informa apenas
+\texttt{NODE\_ID} e \texttt{PEERS}; o papel de líder vem da eleição e pode mudar durante a
+execução. O \texttt{RoundCoordinator}, ativo só no líder, incrementa a rodada, envia
+\texttt{StartRound} e aguarda os \texttt{RoundDone}, com prazo de 30 s; o \texttt{RoundWorker},
+presente em todos os nós, executa as formigas, a seção crítica e a resposta a quem iniciou a
+rodada. O \texttt{LeaderMonitor} envia \textit{heartbeat} a cada segundo e dispara eleição após
+cinco faltas.
 
 \begin{figure}[ht]
   \centering
-  \scalebox{0.88}{\input{figuras/arquitetura}}
+  \scalebox{0.78}{\input{figuras/arquitetura}}
   \caption{Entidades e mensagens. Todos os n\'os s\~ao trabalhadores; o l\'ider (maior id vivo)
-  coordena as rodadas. A matriz de ferom\^onio \'e replicada e s\'o muda dentro da se\c{c}\~ao
-  cr\'itica.}
+  coordena as rodadas, e a matriz de ferom\^onio s\'o muda dentro da se\c{c}\~ao cr\'itica.}
   \label{fig:arquitetura}
 \end{figure}
 
-\subsection{Entidades e pap\'eis}
-
-\pendente{l\'ider (RoundCoordinator), trabalhador (RoundWorker), detector (LeaderMonitor) e m\'odulos de suporte}
-
 \subsection{Mensagens}
 
-% Tabela factual extraída de src/main/proto/node.proto e de rpc/PeerNetwork.
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \begin{tabular}{@{}lll@{}}
-    \toprule
-    Mensagem & Dire\c{c}\~ao & Papel \\
-    \midrule
-    \texttt{Heartbeat}            & n\'o $\to$ l\'ider       & detector de falha e handshake de configura\c{c}\~ao \\
-    \texttt{Election} / \texttt{Coordinator} & todos $\to$ todos & elei\c{c}\~ao (Bully) \\
-    \texttt{RequestCS} / \texttt{ReplyCS}    & n\'o $\leftrightarrow$ n\'o & Ricart-Agrawala (com \texttt{request\_ts}) \\
-    \texttt{StartRound}           & l\'ider $\to$ todos      & in\'icio de rodada \\
-    \texttt{RoundDone}            & n\'o $\to$ coordenador   & melhor rota local da rodada \\
-    \texttt{UpdatePheromone}      & n\'o $\to$ todos         & matriz $n\times n$ + melhor rota (s\'incrono) \\
-    \bottomrule
-  \end{tabular}
-  \caption{Mensagens do servi\c{c}o \texttt{NodeService} (gRPC). Toda mensagem carrega
-  \texttt{sender\_id} e um carimbo de Lamport no cabe\c{c}alho, al\'em do token do cluster.}
-  \label{tab:mensagens}
-\end{table}
-
-\pendente{por que um servi\c{c}o \'unico, e o que vai no cabe\c{c}alho (sender\_id, lamport, token)}
+O serviço \texttt{NodeService} tem oito RPCs unários, sem \textit{streaming}: \textit{heartbeat},
+eleição, exclusão mútua (\texttt{RequestCS}/\texttt{ReplyCS}), início e resultado de rodada e
+atualização da matriz. O cabeçalho leva o remetente e o carimbo de Lamport, e o token do
+\textit{cluster} viaja no \textit{metadata} \texttt{x-cluster-token}, conferido por um interceptor
+antes do \textit{handler}. Um serviço único permite um canal por \textit{peer} para todos os
+módulos.
 
 \subsection{Uma rodada}
 
-\pendente{formigas (ITERATIONS\_PER\_ROUND) $\to$ se\c{c}\~ao cr\'itica (atualiza + propaga) $\to$ RoundDone para quem coordenou}
+Cada rodada usa semente distinta por nó e por rodada, de modo que a mesma configuração reproduz a
+execução. O nó roda \texttt{ITERATIONS\_PER\_ROUND} lotes de formigas sobre o mesmo
+\textit{snapshot} e fica com o melhor; só então entra na seção crítica, onde evapora, deposita e
+transmite a matriz de forma síncrona. A parte cara roda fora dela e em paralelo, e o
+\textit{broadcast} espera apenas os \textit{peers} vivos.
