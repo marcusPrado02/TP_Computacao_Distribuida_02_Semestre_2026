@@ -106,7 +106,7 @@ formigas locais → entra na seção crítica → atualiza e propaga o feromôni
 2. `colony.runAnts(pheromone.snapshot(), ANTS, seed)` → melhor local; loga `melhor local`.
 3. `mutex.acquire()` → loga `ENTROU na seção crítica`.
 4. `pheromone.evaporateAndDeposit(local, ρ)`, `best.offer(local)`.
-5. `network.broadcastPheromone(round, flatten(), best.get(), coordinator)` — **síncrono**: espera a confirmação de todos (o coordenador é sempre tentado; peers em quarentena são pulados).
+5. `network.broadcastPheromone(round, flatten(), best.get(), coordinator)` — **síncrono**: espera a confirmação de todos dos peers **vivos** (peer dado como morto, inclusive o coordenador, recebe em segundo plano; em quarentena é pulado, exceto o coordenador).
 6. `finally`: loga `SAIU da seção crítica` **e só então** chama `mutex.release()`. A ordem importa: depois do `release()` outro nó pode entrar e logar `ENTROU`; logando antes, os logs nunca mostram uma sobreposição falsa.
 7. `reportDone`: se o líder sou eu, `localSink.onRoundDone(...)`; se há líder (`> 0`), `network.sendRoundDone(...)`; senão não avisa.
 8. Erros: `InterruptedException` restaura a flag; `RuntimeException` é logada (`Erro na rodada ...`) sem derrubar o executor.

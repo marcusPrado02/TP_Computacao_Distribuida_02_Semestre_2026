@@ -30,6 +30,7 @@ O mesmo formato (variáveis de ambiente) serve para Docker Compose, terminal loc
 | `tspSeed` | `TSP_SEED` | `42` | Semente da instância aleatória e das formigas |
 | `rounds` | `ROUNDS` | `30` | Total de rodadas |
 | `ants` | `ANTS` | `40` | Formigas por nó por rodada |
+| `iterationsPerRound` | `ITERATIONS_PER_ROUND` | `1` | Lotes de formigas por rodada (alonga só a parte local; ≥ 1). Construtor de 14 argumentos usa 1 |
 | `alpha` | `ALPHA` | `1.0` | Peso do feromônio na escolha da próxima cidade |
 | `beta` | `BETA` | `3.0` | Peso da distância (visibilidade) |
 | `rho` | `RHO` | `0.1` | Taxa de evaporação |

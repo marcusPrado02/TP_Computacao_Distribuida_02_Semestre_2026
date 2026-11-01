@@ -24,7 +24,7 @@ O que deve aparecer (prova de que a rede e a barreira funcionam):
 [N4] LÍDER: iniciando rodada 1/30 com nós [1, 2, 3, 4]
 ```
 
-Failover no ensaio (dura ~7,5 s: 5 heartbeats de 1,5 s + eleição):
+Failover no ensaio (~10 s até `Novo líder`: 5 heartbeats de 1,5 s + eleição; roteiro cronometrado em §3.1):
 
 ```bash
 docker compose -f docker-compose.lan.yml stop node4
@@ -98,6 +98,32 @@ um heartbeat antes da **primeira** rodada (`LÍDER: aguardando peers [...] subir
   → `Novo líder: N3` nas três sobreviventes.
 - Print dos relógios de Lamport crescendo nos logs (`[L=...]`).
 
+### 3.1 Roteiro da demo de failover (cronometrado)
+
+Ensaiado em 01/11/2026 no `docker-compose.lan.yml` (4 nós, berlin52, `ITERATIONS_PER_ROUND=1000`,
+perfil de timeouts LAN). Os tempos são a partir do `stop`.
+
+```bash
+export CLUSTER_TOKEN=$(openssl rand -hex 16) TSP_FILE=/app/data/berlin52.tsp ITERATIONS_PER_ROUND=1000 ROUNDS=30
+docker compose -f docker-compose.lan.yml up --build -d
+docker compose -f docker-compose.lan.yml logs -f --no-log-prefix | grep -E "LÍDER|Novo líder|não responde|inacessível"
+# depois de umas 10 rodadas (~0,85 s cada), em outro terminal:
+docker compose -f docker-compose.lan.yml stop -t 0 node4
+```
+
+| t (s) | O que a banca vê nos logs | O que explicar |
+|---|---|---|
+| 0 | `LÍDER: iniciando rodada 11/30 com nós [1, 2, 3, 4]` e o `stop` | N4 é o líder (maior id) |
+| ~2 | `N4 inacessível (DEADLINE_EXCEEDED)` em N1, N2, N3 | RPC com deadline marca o peer como morto |
+| ~8,5 | `Líder N4 não responde há 5 heartbeats; iniciando eleição` | detector: 5 heartbeats × 1,5 s |
+| ~10 | `Novo líder: N3` nos três | Bully: N3 manda ELECTION a N4, sem OK → se declara |
+| ~12 | `LÍDER: iniciando rodada 12/30 com nós [1, 2, 3]` | rodada 11 (em andamento) é pulada; `START_DELAY_MS` = 2 s |
+| ~12,6 | `LÍDER: rodada 12 concluída` e as próximas a ~0,6 s | Ricart-Agrawala só com os vivos; `[L=...]` segue crescendo |
+
+No compose padrão (`docker-compose.yml`, timeouts de loopback) o mesmo roteiro leva ~5 s até
+`Novo líder`. Fala sugerida enquanto espera os ~8 s do detector: "o detector não distingue lento
+de morto, então esperamos 5 heartbeats para não eleger à toa".
+
 ## 4. Diagnóstico rápido
 
 | Sintoma | Causa provável | Correção |
@@ -107,7 +133,7 @@ um heartbeat antes da **primeira** rodada (`LÍDER: aguardando peers [...] subir
 | `UNAUTHENTICATED` nos logs | `CLUSTER_TOKEN` diferente entre nós | padronizar o token |
 | `PERMISSION_DENIED` | `NODE_ID` não bate com o id usado pelos peers em `PEERS` | conferir a tabela de ids |
 | Eleição sem nó ter caído | `RPC_TIMEOUT_MS` curto demais para o Wi-Fi | subir para 1500–3000 ms |
-| Rodada demora ~5 s depois de uma queda | peer morto ainda sendo aguardado no broadcast | já mitigado (peer morto é pulado); conferir logs |
+| Rodada demora ~5 s depois de uma queda | peer morto ainda sendo aguardado no broadcast | corrigido: só peers vivos são esperados na SC (`BroadcastPheromoneTest`); se voltar a acontecer, conferir logs |
 | Nós não se veem, mas `ping` funciona | rede de visitantes / isolamento do roteador | usar outra rede ou cabo/roteador próprio |
 
 ## 5. Parâmetros de rede (resumo)

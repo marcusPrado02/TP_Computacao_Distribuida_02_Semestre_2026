@@ -106,7 +106,7 @@ start_node() {
   mkdir -p "$LOGS"
   printf '\n--- (re)início %s ---\n' "$(date +%T)" >> "$LOGS/n$id.log"
   env NODE_ID="$id" NODE_PORT="$(port_of "$id")" PEERS="$(peers_of "$id")" CLUSTER_TOKEN="$TOKEN" \
-      ROUNDS="$ROUNDS" ANTS="$ANTS" TSP_CITIES="$CITIES" TSP_SEED="$SEED" TSP_FILE="$TSP_FILE" \
+      ROUNDS="$ROUNDS" ANTS="$ANTS" ITERATIONS_PER_ROUND="${ITERS:-1}" TSP_CITIES="$CITIES" TSP_SEED="$SEED" TSP_FILE="$TSP_FILE" \
       START_DELAY_MS="$DELAY" \
       nohup java -jar "$JAR" >> "$LOGS/n$id.log" 2>&1 &
   echo $! > "$RUN/n$id.pid"
@@ -120,6 +120,7 @@ usage_up() {
   -n NÓS          quantidade de nós            (padrão 4)
   -r RODADAS      rodadas do ACO               (padrão 30)
   -a FORMIGAS     formigas por nó por rodada   (padrão 40)
+  -i ITERAÇÕES    lotes de formigas por rodada (padrão 1; alonga a rodada p/ demo)
   -c CIDADES      cidades da instância         (padrão 60)
   -s SEMENTE      semente da instância         (padrão 42)
   -f ARQUIVO      instância TSPLIB (ex.: data/berlin52.tsp; ignora -c/-s)
@@ -130,10 +131,10 @@ EOF
 
 cmd_up() {
   local OPTIND opt
-  NODES=4 ROUNDS=30 ANTS=40 CITIES=60 SEED=42 TSP_FILE="" DELAY=3000 BASE_PORT=50051
-  while getopts "n:r:a:c:s:f:d:p:h" opt; do
+  NODES=4 ROUNDS=30 ANTS=40 ITERS=1 CITIES=60 SEED=42 TSP_FILE="" DELAY=3000 BASE_PORT=50051
+  while getopts "n:r:a:i:c:s:f:d:p:h" opt; do
     case $opt in
-      n) NODES=$OPTARG ;; r) ROUNDS=$OPTARG ;; a) ANTS=$OPTARG ;; c) CITIES=$OPTARG ;;
+      n) NODES=$OPTARG ;; r) ROUNDS=$OPTARG ;; a) ANTS=$OPTARG ;; i) ITERS=$OPTARG ;; c) CITIES=$OPTARG ;;
       s) SEED=$OPTARG ;; f) TSP_FILE=$(realpath "$OPTARG") ;; d) DELAY=$OPTARG ;; p) BASE_PORT=$OPTARG ;;
       h) usage_up; return ;; *) usage_up; return 1 ;;
     esac
@@ -141,15 +142,17 @@ cmd_up() {
   [[ $NODES =~ ^[0-9]+$ ]] && ((NODES >= 2)) || die "-n precisa ser >= 2"
   [[ -z $TSP_FILE || -f $TSP_FILE ]] || die "arquivo TSP não encontrado: $TSP_FILE"
 
-  [[ -f $STATE ]] && cmd_down quiet
+  # Subshell: cmd_down faz load_state (source do cluster.env antigo), o que sobrescreveria as
+  # opções recém-lidas (NODES, ROUNDS...) com as do "up" anterior.
+  if [[ -f $STATE ]]; then (cmd_down quiet); fi
   ensure_jar
   rm -rf "$LOGS"; mkdir -p "$LOGS"
   TOKEN=$(token)
   # Atribuições simples (não "declare -p"): ao fazer source dentro de uma função, declare criaria locais
   local v
-  for v in NODES ROUNDS ANTS CITIES SEED TSP_FILE DELAY BASE_PORT TOKEN; do printf '%s=%q\n' "$v" "${!v}"; done > "$STATE"
+  for v in NODES ROUNDS ANTS ITERS CITIES SEED TSP_FILE DELAY BASE_PORT TOKEN; do printf '%s=%q\n' "$v" "${!v}"; done > "$STATE"
 
-  info "Subindo $NODES nós: $ROUNDS rodadas, $ANTS formigas/nó, instância ${TSP_FILE:-aleatória ($CITIES cidades, semente $SEED)}"
+  info "Subindo $NODES nós: $ROUNDS rodadas, $ANTS formigas/nó × $ITERS iteração(ões), instância ${TSP_FILE:-aleatória ($CITIES cidades, semente $SEED)}"
   local id
   for ((id = 1; id <= NODES; id++)); do start_node "$id"; done
   printf '%sAcompanhe com ./tp status, ./tp logs -f, ./tp timeline cs%s\n' "$DIM" "$RST"
