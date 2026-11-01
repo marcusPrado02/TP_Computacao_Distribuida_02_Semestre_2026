@@ -57,8 +57,8 @@ lógico de Lamport e exclusão mútua de Ricart-Agrawala. Em ensaios com quatro 
 \textit{berlin52}, as réplicas convergiram para matrizes idênticas e o \textit{cluster} atingiu a
 rota de 7542, que é o ótimo conhecido. O \textit{failover} do líder levou cerca de 10 s no perfil
 de rede local, e a primeira rodada após a queda caiu de 15,6 s para 0,56 s depois de corrigirmos o
-\textit{broadcast}. Os quatro requisitos operam de forma integrada; a limitação central --- não
-distinguir nó lento de nó morto --- fica para a próxima etapa.
+\textit{broadcast}. A limitação central --- não distinguir nó lento de nó morto --- fica para a
+próxima etapa.
 \end{resumo}
 
 \begin{abstract}
@@ -69,9 +69,8 @@ heartbeat-based failure detection, Lamport logical clocks and Ricart-Agrawala mu
 trials with four nodes and the \textit{berlin52} instance, the replicas converged to identical
 matrices and the \textit{cluster} reached the 7542 tour, which is the known optimum. Leader
 failover took about 10 s on the local network profile, and the first round after the crash dropped
-from 15.6 s to 0.56 s after we fixed the \textit{broadcast}. The four requirements operate
-together; the central limitation --- not telling a slow node from a dead one --- is left for the
-next stage.
+from 15.6 s to 0.56 s after we fixed the \textit{broadcast}. The central limitation --- not telling a
+slow node from a dead one --- is left for the next stage.
 \end{abstract}
 
 \noindent\textbf{Palavras-chave:} computa\c{c}\~ao distribu\'ida; col\^onia de formigas;
