@@ -11,20 +11,21 @@
     Rodada (berlin52, 40 formigas/n\'o, $I{=}1000$) & $\approx$0,94 s (mediana; 0,84--1,36 s) \\
     Melhor rota em berlin52 (20--30 rodadas)        & 7542 (\'otimo conhecido) \\
     Failover do l\'ider (4 n\'os, perfil LAN)       & $\approx$10 s at\'e \texttt{Novo l\'ider: N3} \\
-    1\textsuperscript{a} rodada ap\'os a queda      & 0,56 s (era 15,6 s antes do F14) \\
+    1\textsuperscript{a} rodada ap\'os a queda      & 0,56 s (era 15,6 s antes da corre\c{c}\~ao) \\
     Execu\c{c}\~ao longa / queda de seguidor        & 4000 rodadas sem timeout; 600 conclu\'idas \\
     \bottomrule
   \end{tabular}
-  \caption{Medidas do sistema. Exceto a execu\c{c}\~ao longa (auditoria de 20/10), os tempos
+  \caption{Medidas do sistema. Exceto a execu\c{c}\~ao longa (ensaio de 20 de outubro), os tempos
   v\^em de uma m\'aquina com 4 cont\^eineres; $I$ \'e \texttt{ITERATIONS\_PER\_ROUND}.
   N\~ao medimos speedup de 1$\times$N n\'os.}
   \label{tab:resultados}
 \end{table}
 
-As réplicas convergem ao final, e o \texttt{./tp check} confirma que nunca houve dois nós na seção
-crítica; o \textit{cluster} atinge o ótimo conhecido em \textit{berlin52}. A rodada leva cerca de
-0,94 s, quase toda em CPU local, com a rede entrando uma vez por rodada. O \textit{failover} leva
-cerca de 10 s até o anúncio do novo líder, dos quais 8,5 s são apenas o detector.
+As réplicas convergem ao final, e o script de auditoria de logs (\texttt{./tp check}) confirma que
+nunca houve dois nós na seção crítica; o \textit{cluster} atinge o ótimo conhecido em
+\textit{berlin52}, e a Tabela~1 resume as demais medidas. A rodada leva cerca de 0,94 s, quase toda
+em CPU local, com a rede entrando uma vez por rodada. O \textit{failover} leva cerca de 10 s até o anúncio do novo líder, dos quais 8,5 s
+são apenas o detector.
 
 Medir o \textit{failover} de ponta a ponta revelou um custo que o teste unitário não via: a primeira
 rodada após a queda levava 15,6 s, porque o \textit{broadcast} aguardava o \textit{peer} morto até o

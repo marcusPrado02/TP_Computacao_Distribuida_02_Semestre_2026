@@ -2,8 +2,8 @@
 
 O problema do caixeiro-viajante (TSP) pede o ciclo de menor comprimento que visite cada cidade uma
 vez e retorne à origem; por ser NP-difícil, instâncias práticas são atacadas por heurísticas.
-Usamos \textit{berlin52}, da TSPLIB~\cite{reinelt91} (52 cidades, ótimo 7542), e uma instância
-aleatória de 60 cidades, ambas com distâncias euclidianas.
+Usamos \textit{berlin52}, da TSPLIB~\cite{reinelt91}, com 52 cidades, ótimo 7542 e distâncias
+euclidianas.
 
 A colônia de formigas (ACO)~\cite{dorigo97} se distribui bem porque cada formiga é independente: lê
 a matriz de feromônio no início do passeio e devolve uma rota. O custo divide-se quase linearmente

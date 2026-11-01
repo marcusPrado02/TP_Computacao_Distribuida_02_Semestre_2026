@@ -9,7 +9,7 @@ o material de estudo e as perguntas de cada fatia estão em [`docs/ARGUICAO.md`]
 | Pessoa | Módulo | Pacotes/arquivos | Seções do relatório | Entregável verificável |
 |---|---|---|---|---|
 | A — Pedro Henrique Vilaça Valverde | gRPC, infraestrutura, Docker, LAN | `rpc/`, `node.proto`, `NodeMain`, `Dockerfile`, `docker-compose*.yml` | **§2, §3.1 e §4 + Tabela 1** | ensaio em 2 máquinas + montagem final do PDF |
-| B — Gabriel Batista de Almeida | ACO / TSP e rodadas | `aco/`, `round/` | §1 e §2.3 | log do ensaio de berlin52 (tempos + `melhor rota = 7542`) |
+| B — Gabriel Batista de Almeida | ACO / TSP e rodadas | `aco/`, `round/` | §1 e §2.2 | log do ensaio de berlin52 (tempos + `melhor rota = 7542`) |
 | C — Eduardo Alves Salgado Lisboa Oliveira | Eleição de líder (Bully) + detector | `election/` | §3.2 | failover cronometrado (`docs/LAN.md` §3.1) |
 | D — Marcus Prado Silva | Relógio de Lamport + Ricart-Agrawala | `clock/`, `mutex/` | **§3.3, §3.4 e §5** | `./tp check` + `./tp timeline cs` arquivados |
 

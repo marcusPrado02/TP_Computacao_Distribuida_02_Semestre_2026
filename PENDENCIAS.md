@@ -234,7 +234,7 @@ Pendente (o que ainda falta para a entrega):
   B = Gabriel (`aco/`, `round/`), C = Eduardo (`election/`), D = Marcus (`clock/`, `mutex/`).
   Distribuição revisada para refletir o peso real: Pedro responde por §2, §3.1 e §4 + Tabela 1
   (mais o ensaio em 2 máquinas e a montagem do texto); Marcus por §3.3, §3.4 e §5 + `./tp check`;
-  Gabriel por §1 e §2.3 + o log do ensaio de berlin52; Eduardo por §3.2 + o failover cronometrado.
+  Gabriel por §1 e §2.2 + o log do ensaio de berlin52; Eduardo por §3.2 + o failover cronometrado.
   O §6 usa "ficou com"/"ficou responsável por" (não afirma autoria de código). Tabelas de
   entregáveis e perguntas de arguição em [`docs/ARGUICAO.md`](docs/ARGUICAO.md) e no `TODO.md`.
   **Risco assumido:** só Pedro e Marcus commitaram (`git log -- src/main`); Gabriel e Eduardo precisam
