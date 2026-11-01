@@ -1,25 +1,47 @@
 \section{Resultados}
 
-% ============================ ROTEIRO ============================
-% Fontes dos numeros: docs/AUDITORIA.md (20/10) e ensaio de compose LAN em 1 maquina (28/10).
-% R4: confirmar com o ensaio de 2 maquinas (docs/evidencias/) ou remover a frase sobre
-% maquinas fisicas.
+% ======================= ROTEIRO COMPLETO =======================
+% SEÇÃO 4 — orçamento: 7 linhas de texto + Tabela 2.
+% Todos os números abaixo foram medidos; não invente outro.
 %
-% [4.1 O que a tabela mostra -- 1 paragrafo]
-%  - Replicas convergem: ao fim das rodadas as matrizes sao identicas nos 4 nos
-%    (ClusterIntegrationTest.elegeMaiorIdExecutaTodasAsRodadasEReplicasConvergem).
-%  - Custo por rodada: ~50 ms de computo local contra 1 broadcast sincrono; ou seja, o
-%    gargalo e a rede, nao as formigas.
-%  - Failover: ~7,5 s na LAN = 5 heartbeats de 1,5 s + eleicao; no compose (heartbeat 1 s)
-%    sao ~5 s. Comparar com o que se esperaria sem detector (rodada de 30 s por timeout).
-%  - Honestidade metodologica: a linha de tempo foi medida em 1 maquina com 4 containers;
-%    4000 rodadas e 600 rodadas com seguidor morto vem da auditoria de 20/10.
+% [P1] O que a tabela mostra — 1 parágrafo, ~4 linhas.
+%   AFIRMAÇÕES, nesta ordem:
+%   a) convergência: ao fim das rodadas as matrizes são idênticas nos 4 nós
+%      (ClusterIntegrationTest.elegeMaiorIdExecutaTodasAsRodadasEReplicasConvergem);
+%      é a evidência de que a exclusão mútua está fazendo seu trabalho;
+%   b) convergência de resultado: em berlin52 o cluster chega a 7542, que é o
+%      ótimo conhecido — ou seja, a distribuição não degradou a qualidade;
+%   c) custo por rodada: ~0,94 s com ITERATIONS_PER_ROUND=1000, dos quais a
+%      maior parte é CPU local (formigas); a rede entra uma vez por rodada, com
+%      um broadcast síncrono da matriz 52 x 52;
+%   d) failover: ~10 s até "Novo líder: N3" no perfil LAN, sendo ~8,5 s só de
+%      detector (5 heartbeats de 1,5 s) — o resto é a eleição.
+%   RESSALVA METODOLÓGICA (dizer sem rodeio): as medidas de tempo foram feitas
+%   em UMA máquina com 4 contêineres; os números de execução longa vêm da
+%   auditoria de 20/10. Não medimos speedup de 1 x N nós.
+%   FONTE: PENDENCIAS.md §2.1 (mediana 943 ms, mín. 843, máx. 1357);
+%   docs/LAN.md §3.1; data/README.md.
 %
-% [4.2 Ensaio em 2 maquinas -- 1 paragrafo, so se for feito]
-%  - Mesmo commit nas duas, porta 50051 liberada, mesmo CLUSTER_TOKEN.
-%  - Reportar: 30 rodadas, ms/rodada, melhor rota igual nos dois logs, tempo de failover.
-%  - Se nao for feito, APAGAR a frase e nao mencionar maquinas fisicas.
-% =================================================================
+% [P2] A correção que os números revelaram — 1 parágrafo, ~3 linhas.
+%   Esta é a parte mais forte da seção; não pule.
+%   FATO: no primeiro ensaio com failover, a primeira rodada depois da queda do
+%   líder levava 15,6 s, e cada sobrevivente ficava ~5 s dentro da seção crítica
+%   (logs ENTROU -> SAIU). Causa: o broadcast esperava o peer morto até o
+%   BROADCAST_TIMEOUT_MS, e o coordenador era sempre aguardado, mesmo morto.
+%   Correção (F14): esperar só peers vivos; morto recebe em segundo plano.
+%   NÚMERO depois: 0,56 s.
+%   LIÇÃO a escrever: medir o failover de ponta a ponta expôs um custo que o
+%   teste de unidade não via — o timeout estava "correto" e ainda assim errado.
+%   FONTE: docs/AUDITORIA.md F14; BroadcastPheromoneTest.
+%
+% [P3] Ensaio em 2 máquinas físicas — SÓ se for feito. ~3 linhas.
+%   Se fizerem: mesmo commit nas duas, porta 50051 liberada, mesmo CLUSTER_TOKEN;
+%   reportar 30 rodadas, ms/rodada, melhor rota IGUAL nos dois logs e tempo de
+%   failover (roteiro e coleta em docs/LAN.md §2 e docs/evidencias/README.md).
+%   Se NÃO fizerem: apague este parágrafo inteiro e não mencione "máquinas
+%   físicas" em lugar nenhum — a Entrega 1 não exige o ensaio (§3.1 do enunciado
+%   pede capacidade, não evidência).
+% ===============================================================
 
 \begin{table}[t]
   \centering
@@ -28,19 +50,22 @@
     \toprule
     Medida & Valor observado \\
     \midrule
-    Testes automatizados (unit\'arios + integra\c{c}\~ao) & 40, todos passando \\
-    Rodadas de 30 (60 cidades, 40 formigas por n\'o)      & $\approx$1,5 s no total ($\approx$50 ms/rodada) \\
-    Melhor rota encontrada (seed 42)                       & 6067 \\
-    Failover do l\'ider (4 n\'os, configura\c{c}\~ao LAN)  & $\approx$7,5 s (5 heartbeats de 1,5 s + elei\c{c}\~ao) \\
-    Estabilidade em execu\c{c}\~ao longa                   & 4000 rodadas sem timeout \\
-    Queda de seguidor no meio da execu\c{c}\~ao            & sobreviventes conclu\'iram as 600 rodadas \\
+    Testes automatizados                            & 43 em 12 classes, 0 falhas \\
+    Rodada (berlin52, 40 formigas/n\'o, $I{=}1000$) & $\approx$0,94 s (mediana; 0,84--1,36 s) \\
+    Melhor rota em berlin52 (20--30 rodadas)        & 7542 (\'otimo conhecido) \\
+    Failover do l\'ider (4 n\'os, perfil LAN)       & $\approx$10 s at\'e \texttt{Novo l\'ider: N3} \\
+    1\textsuperscript{a} rodada ap\'os a queda      & 0,56 s (era 15,6 s antes do F14) \\
+    Execu\c{c}\~ao longa / queda de seguidor        & 4000 rodadas sem timeout; 600 conclu\'idas \\
     \bottomrule
   \end{tabular}
-  \caption{Medidas do sistema. A linha de tempo por rodada foi obtida em uma \'unica m\'aquina
-  (4 cont\^eineres); os n\'umeros de execu\c{c}\~oes longas v\^em da auditoria de 20/10.}
+  \caption{Medidas do sistema. Exceto a execu\c{c}\~ao longa (auditoria de 20/10), os tempos
+  foram obtidos em uma \'unica m\'aquina com 4 cont\^eineres; $I$ \'e \texttt{ITERATIONS\_PER\_ROUND}.
+  N\~ao medimos speedup de 1$\times$N n\'os.}
   \label{tab:resultados}
 \end{table}
 
-\pendente{o que a tabela mostra: r\'eplicas convergem, custo de rede por rodada, tempo de detec\c{c}\~ao}
+\pendente{o que a tabela mostra: r\'eplicas convergem, 7542 = \'otimo, custo por rodada, failover}
 
-\pendente{ensaio em 2 m\'aquinas f\'isicas (se j\'a feito; sen\~ao remover esta frase)}
+\pendente{o failover de 15,6 s $\to$ 0,56 s (F14): medir de ponta a ponta exp\^os um custo que o teste unit\'ario n\~ao via}
+
+\pendente{ensaio em 2 m\'aquinas f\'isicas (se j\'a feito; sen\~ao apagar este par\'agrafo)}

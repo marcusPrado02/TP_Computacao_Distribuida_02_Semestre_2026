@@ -119,10 +119,11 @@ docker compose logs --no-log-prefix | grep -E "ENTROU|SAIU" | sort
 2. Mostre `Novo líder: N4` em todos os nós: o maior id vence.
 
 ### Demo 2: queda do líder (failover)
-1. Com o sistema rodando: `docker compose stop node4`
-2. Em ~7,5 s na LAN (5 heartbeats de 1,5 s), os seguidores logam `Líder N4 não responde há 5 heartbeats`.
-   No compose padrão (heartbeat de 1 s) são ~5 s.
-3. Nova eleição: `Novo líder: N3`, que continua da última rodada vista.
+1. Com o sistema rodando: `docker compose stop -t 0 node4`
+2. Em ~2 s os peers logam `N4 inacessível (DEADLINE_EXCEEDED)`; em ~8,5 s no perfil LAN
+   (5 heartbeats de 1,5 s) vem `Líder N4 não responde há 5 heartbeats; iniciando eleição`.
+   No compose padrão (heartbeat de 1 s) o detector leva ~5 s.
+3. Nova eleição: `Novo líder: N3` (~10 s no perfil LAN), que continua da última rodada vista.
 4. Opcional: `docker compose start node4`. Ele sobe, faz eleição, vence e N3 aceita.
 
 ### Demo 3: exclusão mútua com relógio de Lamport

@@ -41,7 +41,7 @@ Tudo roda em containers; não é preciso ter Java/Maven instalado no host.
 
 ```bash
 docker build --target build -t aco-build .
-docker run --rm aco-build mvn -B test   # 40 testes (unitários + integração), ~10 s
+docker run --rm aco-build mvn -B test   # 43 testes (unitários + integração), ~10 s
 docker compose up --build               # cluster de 4 nós
 ```
 

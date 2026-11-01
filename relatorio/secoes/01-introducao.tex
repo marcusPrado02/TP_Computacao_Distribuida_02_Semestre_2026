@@ -1,35 +1,53 @@
 \section{Introdu\c{c}\~ao}
 
-% ============================ ROTEIRO ============================
-% Cada bloco abaixo vira 1 paragrafo. Os bullets sao FATOS (com fonte);
-% a frase e de voces. Remova este bloco depois de escrever.
+% ======================= ROTEIRO COMPLETO =======================
+% SEÇÃO 1 — orçamento: 10 linhas (4 parágrafos: 2 + 3 + 3 + 2).
+% Cada bloco [P*] vira UM parágrafo. Escreva em prosa os fatos listados,
+% nesta ordem. Não acrescente fato sem fonte. Ao terminar: apague este bloco
+% e o \pendente correspondente.
 %
-% [1.1 Problema]  fonte: docs/algoritmos/aco-tsp.md
-%  - TSP: menor ciclo que visita as n cidades uma vez e volta; NP-dificil.
-%  - Instancia usada: 60 cidades, distancia euclidiana (TSP_CITIES=60, TSP_SEED=42).
-%  - Por que distribuir: as formigas sao independentes -> o custo local divide bem;
-%    o unico acoplamento e a matriz de feromonio.
-%  - Frase-alvo: "Cada no explora um subconjunto de formigas e o acoplamento entre eles
-%    se resume a matriz de feromonio."
+% [P1] O problema. (~2 linhas)
+%   FATOS: o caixeiro-viajante pede o ciclo mais curto que visita cada cidade
+%   exatamente uma vez e volta à origem; é NP-difícil, então instâncias reais
+%   são atacadas por heurística, não por força bruta.
+%   NÚMEROS: usamos berlin52 (52 cidades, ótimo conhecido 7542) e uma instância
+%   aleatória de 60 cidades; ambas com distância euclidiana.
+%   FONTE: docs/algoritmos/aco-tsp.md §1; data/README.md.
+%   EVITAR: história do problema, definição formal de grafo, notação matemática.
 %
-% [1.2 O que foi construido]
-%  - Java 21 + gRPC; 4 nos (1 lider + 3 trabalhadores); Docker Compose e execucao em LAN.
-%  - Sem banco/estado externo: matriz n x n replicada em memoria, seccao critica distribuida.
-%  - Evidencia de funcionamento: 40 testes automatizados, compose de 4 nos, failover N4 -> N3.
+% [P2] Por que distribuir. (~3 linhas)
+%   FATOS: na colônia de formigas cada formiga é independente — ela só lê a
+%   matriz de feromônio no início do passeio e devolve uma rota. Logo o custo
+%   computacional (o "passeio" de cada formiga) divide quase linearmente entre
+%   nós, e o único estado compartilhado é a matriz n x n.
+%   CONSEQUÊNCIA a dizer: o acoplamento entre nós é pequeno e bem delimitado —
+%   por isso o problema é bom para mostrar coordenação distribuída.
+%   FONTE: docs/algoritmos/aco-tsp.md §2-3; src/.../aco/AntColony.java.
+%   EVITAR: afirmar speedup medido (não medimos 1 x N nós; ver §4).
 %
-% [1.3 Requisitos]
-%  - Quatro dos seis itens do enunciado: gRPC, Lamport, Bully e Ricart-Agrawala.
-%  - O minimo exigido era dois. Dizer isso de forma direta: e o criterio de complexidade.
-%  - Frase-alvo: "Optamos por implementar quatro requisitos, e nao o minimo de dois."
+% [P3] O que foi construído. (~3 linhas)
+%   FATOS: cluster em Java 21 com comunicação por gRPC; N nós simétricos (mesmo
+%   binário; o papel vem da eleição); líder eleito por Bully dispara rodadas;
+%   cada nó roda um lote de formigas, entra na seção crítica, atualiza e propaga
+%   a matriz de feromônio; réplica da matriz em memória, sem banco de dados;
+%   roda em Docker Compose e em máquinas separadas na mesma LAN.
+%   NÚMEROS: 43 testes automatizados, 4 nós no ensaio; melhor rota em berlin52
+%   = 7542 (o ótimo).
+%   FONTE: README.md; docs/ARQUITETURA.md §1; docs/LAN.md; §4 deste relatório.
 %
-% [1.4 Organizacao]
-%  - Uma frase: Secao 2 arquitetura, 3 requisitos, 4 resultados, 5 desafios, 6 papeis.
-% =================================================================
+% [P4] Requisitos e organização. (~2 linhas)
+%   FATOS: o enunciado exige no mínimo dois itens da lista; implementamos
+%   QUATRO: RPC/gRPC, relógio lógico de Lamport, eleição de líder (Bully) e
+%   exclusão mútua (Ricart-Agrawala).
+%   Frase-alvo: "Optamos por implementar quatro requisitos, e não o mínimo de dois."
+%   Última frase: mapa do artigo (§2 arquitetura, §3 requisitos, §4 resultados,
+%   §5 desafios, §6 papéis).
+% ===============================================================
 
-\pendente{problema: TSP e por que distribuir}
+\pendente{problema: TSP, berlin52 e por que heurística}
 
-\pendente{o que foi construido, em 3 linhas}
+\pendente{por que distribuir: formigas independentes, único acoplamento é a matriz}
 
-\pendente{4 requisitos atendidos (o enunciado exige 2) -- dizer explicitamente}
+\pendente{o que foi construído: Java 21 + gRPC, líder eleito, matriz replicada}
 
-\pendente{organizacao do artigo}
+\pendente{4 requisitos atendidos (o enunciado exige 2) e a organização do artigo}
