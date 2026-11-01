@@ -8,7 +8,7 @@ aleatória de 60 cidades, ambas com distâncias euclidianas.
 A colônia de formigas (ACO)~\cite{dorigo97} se distribui bem porque cada formiga é independente: lê
 a matriz de feromônio no início do passeio e devolve uma rota. O custo divide-se quase linearmente
 entre os nós, e o único estado compartilhado é a matriz $n \times n$ --- um acoplamento pequeno e
-bem delimitado, adequado para estudar coordenação.
+bem delimitado.
 
 Construímos um \textit{cluster} em Java 21 com gRPC. Todos executam o mesmo binário, e o papel de
 líder ou trabalhador vem da eleição, não da configuração. Cada nó roda um lote de formigas, entra

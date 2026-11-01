@@ -40,13 +40,18 @@ no fim). Eles já estão no `.gitignore` da raiz.
 O PDF fecha em **4 páginas** com 1 figura, 1 tabela e 5 referências. A margem é apertada:
 acrescentar uma única frase foi suficiente para estourar para 5 páginas durante a edição.
 
+O ponto mais frágil é a **quebra da lista de referências**: sobrava menos de uma linha para a
+quinta entrada. A solução foi `\setlength{\itemsep}{2pt}` em `secoes/07-referencias.tex` (as cinco
+entradas cabem na página 4). Se voltar a estourar, é ali que se ganha espaço sem cortar texto.
+
 Se precisar de espaço:
 
 1. cortar a `figuras/arquitetura.tex` (Figura 1) — libera ~13 linhas;
 2. cortar a Tabela 1 de resultados — libera ~11 linhas;
 3. encurtar o resumo/abstract (hoje 17 linhas somadas).
 
-Para medir: o `.sty` da SBC usa 12 pt com entrelinha de 14 pt, o que dá ~48 linhas por página.
+Para medir: o `.sty` da SBC usa 12 pt com entrelinha de 14 pt e `parskip` de 6 pt, o que dá ~48
+linhas por página.
 
 ## Por que TikZ em vez de exportar os Mermaid
 
@@ -79,7 +84,9 @@ Se a SBC publicar uma versão nova do `.sty`, substitua o arquivo desta pasta pe
 1. ~~Autores~~ — fechado: Pedro Henrique Vilaça Valverde, Marcus Prado Silva,
    Gabriel Batista de Almeida e Eduardo Alves Salgado Lisboa Oliveira.
 2. **Reescrever o texto** com palavras do grupo — é o item que decide a nota (ver aviso no topo).
-3. **Confirmar a divisão de Gabriel e Eduardo** em §6: o texto assume B = ACO/rodadas e
-   C = eleição/detector, conforme o `TODO.md`.
+3. ~~Divisão de Gabriel e Eduardo~~ — fechada: B = Gabriel (`aco/`, `round/`) e C = Eduardo
+   (`election/`). O §6 diz "ficou responsável por" e nomeia um entregável por pessoa; o roteiro de
+   arguição e os entregáveis estão em [`../docs/ARGUICAO.md`](../docs/ARGUICAO.md).
 4. **Data/formato da entrega** — confirmar no Canvas.
-5. **Ensaio em 2 máquinas** — se for feito, acrescentar um parágrafo em §4 (hoje não menciona).
+5. **Ensaio em 2 máquinas** — se for feito, acrescentar um parágrafo em §4 (hoje não menciona);
+   o PDF está em 4 páginas, então algo terá de sair.

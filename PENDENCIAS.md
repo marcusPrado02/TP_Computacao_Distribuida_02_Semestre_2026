@@ -35,7 +35,7 @@ na §3) e o push da `main`.
 - `data/berlin52.tsp` (TSPLIB, ótimo 7542) e `ITERATIONS_PER_ROUND` (rodada de ~1 s).
 - Handshake de configuração no startup (token, remetente e conjunto `{self} ∪ PEERS`).
 - Docs: `docs/ARQUITETURA.md` (com limitações conhecidas §6), `docs/LAN.md`, `docs/AUDITORIA.md`
-  (F1–F15), `docs/ENUNCIADO.md`, `README.md`.
+  (F1–F15), `docs/ENUNCIADO.md`, `docs/ARGUICAO.md`, `README.md`.
 - Relatório: andaime no template SBC + roteiro completo por seção em `relatorio/`. A prosa é do grupo.
 
 > Sem `mvn`/`java` no `PATH` desta máquina? Rode a suíte dentro da imagem de build:
@@ -230,8 +230,13 @@ Pendente (o que ainda falta para a entrega):
 
 - [x] **R1 — Autores:** Pedro Henrique Vila\c{c}a Valverde, Marcus Prado Silva,
   Gabriel Batista de Almeida e Eduardo Alves Salgado Lisboa Oliveira (4, dentro do 4–5 do enunciado).
-- [ ] **R1b — Divisão em §6:** o texto atribui B (ACO/rodadas) a Gabriel e C (eleição/detector) a
-  Eduardo, seguindo o `TODO.md`. **Confirmar** — é a única atribuição que não vem do git.
+- [x] **R1b — Divisão em §6:** decidida em 01/11 — A = Pedro (`rpc/`, `config/`, infra, LAN),
+  B = Gabriel (`aco/`, `round/`), C = Eduardo (`election/`), D = Marcus (`clock/`, `mutex/`).
+  O §6 usa "ficou responsável por" (não afirma autoria de código) e nomeia um entregável verificável
+  por pessoa. As tabelas de entregáveis e as perguntas de arguição estão em
+  [`docs/ARGUICAO.md`](docs/ARGUICAO.md) e no `TODO.md`.
+  **Risco assumido:** só Pedro e Marcus commitaram; Gabriel e Eduardo precisam fazer o entregável
+  deles (remedir berlin52 / rodar o failover) para a frase do §6 se sustentar.
 - [ ] **R2 — Data e formato:** confirmar no Canvas o prazo e se é upload de PDF.
 - [x] **R3 — Texto das seis seções e do resumo/abstract:** escrito, com os números de 01/11.
 - [ ] **R4 — Ensaio de 2 máquinas:** §4 hoje não menciona máquinas físicas (só a legenda da
