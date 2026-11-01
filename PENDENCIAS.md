@@ -10,7 +10,7 @@
 
 **Resumo (01/11):** 0 bloqueadores técnicos. Falta: ensaio físico em 2 máquinas (1.2, recomendado),
 estudo do Bully por C (2.4, material pronto), **reescrever o texto do relatório** (R6 — ver o aviso
-na §3) e o push da `main`.
+na §3) e os entregáveis de B e C (`docs/ARGUICAO.md`). A `main` está publicada (`5d3302a`).
 
 | # | Item | Dono (TODO.md) | Bloqueia a entrega? |
 |---|---|---|---|
@@ -254,11 +254,13 @@ Pendente (o que ainda falta para a entrega):
 
 ## 4. Higiene da entrega
 
-- [ ] **Push da `main`:** `origin/main` está em `99d7525` (PR #3 do Marcus); os commits do
-  relatório (`5bf8d60`, `b4809fc`, `673da5c` + merge `3eeaf76`) estão **só locais**. Falta `git push`.
+- [x] **Push da `main`:** feito em 01/11 — `origin/main` em `5d3302a` (fast-forward de `99d7525`,
+  9 commits: relatório completo, correções F14/F15, roteiros, arguição).
 - [x] Merge de `entrega1/validacoes` (`3290e09`), de `entrega1/pendencias` (`56e5955`),
   de `entrega1/implementacao` (`4591109`) e de `entrega1/pendencias-finais` (PR #3, `3eeaf76`).
-- [ ] Apagar `entrega1/pendencias-finais` no GitHub (já mesclado via PR #3).
+- [ ] `entrega1/pendencias-finais` **continua no GitHub** (já mesclada). Não é do Pedro: os 5 commits
+  são do Marcus e o PR #3 veio de `marcusPrado02` — apagar só com o aval dele.
+- [ ] Limpar a branch local `entrega1/pendencias` (já mesclada na `main`, remoto `gone`).
 - [ ] Confirmar **mesmo commit** em todas as máquinas do ensaio (`git rev-parse --short HEAD`).
 - [ ] `git status` limpo em cada máquina; `dependency-reduced-pom.xml` e `target/` já estão ignorados.
 - [ ] Anotar versões usadas no relatório: `java -version`, `docker --version`, `docker compose version`.
