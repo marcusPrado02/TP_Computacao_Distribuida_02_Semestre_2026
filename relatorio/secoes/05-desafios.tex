@@ -9,7 +9,6 @@ disponibilidade.
 
 Já a queda de um \textit{peer} entre o \texttt{REQUEST} e o \texttt{REPLY} deixava a aquisição
 presa, pois o nó aguarda $N-1$ permissões; passamos a reenviar o pedido a cada 500 ms e a
-recontatar quem volta após a quarentena, o que também destravou a queda de seguidor, antes
-responsável por 30 s de \textit{timeout} por rodada. Configurações divergentes, por fim, geravam
-\textit{split-brain} silencioso, e agora a subida valida token, remetente e conjunto de membros,
-encerrando com código 2; dois grupos sem membro em comum ainda não são detectados.
+recontatar quem volta após a quarentena, o que também destravou a queda de seguidor, que custava
+30 s por rodada. Configurações divergentes, por fim, geravam \textit{split-brain} silencioso e
+agora são recusadas na subida, com código 2.

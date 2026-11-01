@@ -5,10 +5,9 @@
 Usamos oito RPCs unários em um serviço, sem \textit{streaming}. Toda chamada tem prazo
 configurável: 500 ms para mensagens de controle no \textit{loopback} e 1500 ms em rede local, com
 prazos maiores para o \textit{broadcast} e para a espera do \texttt{COORDINATOR}. O interceptor
-exige o token do \textit{cluster} (\texttt{UNAUTHENTICATED}) e o serviço recusa remetente fora de
-\texttt{PEERS} (\texttt{PERMISSION\_DENIED}). A decisão mais visível foi o limite de 64 MiB por
-mensagem: o padrão de 4 MiB estourava a matriz a partir de cerca de 725 cidades e o \textit{peer}
-era marcado como morto.
+exige o token do \textit{cluster} e o serviço recusa remetente fora de \texttt{PEERS}. A decisão
+mais visível foi o limite de 64 MiB por mensagem: o padrão de 4 MiB estourava a matriz a partir de
+cerca de 725 cidades e o \textit{peer} era marcado como morto.
 
 \subsection{Elei\c{c}\~ao de l\'ider -- Bully}
 
