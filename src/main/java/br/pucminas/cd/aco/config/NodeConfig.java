@@ -24,6 +24,7 @@ public record NodeConfig(
         long tspSeed,
         int rounds,
         int ants,
+        int iterationsPerRound,
         double alpha,
         double beta,
         double rho,
@@ -42,6 +43,8 @@ public record NodeConfig(
      * @param tspSeed      semente da instância aleatória e das formigas (TSP_SEED)
      * @param rounds       total de rodadas (ROUNDS)
      * @param ants         formigas por nó por rodada (ANTS)
+     * @param iterationsPerRound lotes de formigas por nó por rodada (ITERATIONS_PER_ROUND); só alonga
+     *                     a parte local, o custo de rede e de seção crítica continua 1 por rodada
      * @param alpha        peso do feromônio (ALPHA)
      * @param beta         peso da visibilidade 1/d (BETA)
      * @param rho          taxa de evaporação em (0, 1] (RHO)
@@ -58,10 +61,19 @@ public record NodeConfig(
         require(tspFile != null || tspCities >= 3, "TSP_CITIES deve ser >= 3");
         require(rounds >= 1, "ROUNDS deve ser >= 1");
         require(ants >= 1, "ANTS deve ser >= 1");
+        require(iterationsPerRound >= 1, "ITERATIONS_PER_ROUND deve ser >= 1");
         require(alpha >= 0 && beta >= 0, "ALPHA e BETA devem ser >= 0");
         require(rho > 0 && rho <= 1, "RHO deve estar em (0, 1]");
         require(startDelayMs >= 0, "START_DELAY_MS deve ser >= 0");
         peers = Collections.unmodifiableMap(new LinkedHashMap<>(peers));
+    }
+
+    /** Mesma configuração com {@code iterationsPerRound = 1} (comportamento anterior ao parâmetro). */
+    public NodeConfig(int nodeId, int port, Map<Integer, String> peers, String clusterToken, String tspFile,
+                      int tspCities, long tspSeed, int rounds, int ants, double alpha, double beta, double rho,
+                      long startDelayMs, Timeouts timeouts) {
+        this(nodeId, port, peers, clusterToken, tspFile, tspCities, tspSeed, rounds, ants, 1,
+                alpha, beta, rho, startDelayMs, timeouts);
     }
 
     /** Lê e valida a configuração das variáveis de ambiente, aplicando os valores padrão. */
@@ -76,6 +88,7 @@ public record NodeConfig(
                 parse("TSP_SEED", env("TSP_SEED", "42"), Long::parseLong),
                 parse("ROUNDS", env("ROUNDS", "30"), Integer::parseInt),
                 parse("ANTS", env("ANTS", "40"), Integer::parseInt),
+                parse("ITERATIONS_PER_ROUND", env("ITERATIONS_PER_ROUND", "1"), Integer::parseInt),
                 parse("ALPHA", env("ALPHA", "1.0"), Double::parseDouble),
                 parse("BETA", env("BETA", "3.0"), Double::parseDouble),
                 parse("RHO", env("RHO", "0.1"), Double::parseDouble),

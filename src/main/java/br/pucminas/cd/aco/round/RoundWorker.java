@@ -80,7 +80,15 @@ public final class RoundWorker implements AutoCloseable {
             // Semente distinta por (nó, rodada): nós diferentes exploram rotas diferentes,
             // e a mesma configuração reproduz a mesma execução.
             long seed = cfg.tspSeed() * 1_000_003L + round * 101L + cfg.nodeId();
-            Tour local = colony.runAnts(pheromone.snapshot(), cfg.ants(), seed);
+            // ITERATIONS_PER_ROUND lotes sobre o MESMO snapshot, ficando com a melhor rota: alonga só a
+            // parte local (paralela, fora da SC) sem mudar o protocolo nem o custo de rede da rodada.
+            // A iteração 0 usa a semente original, então o padrão (1) reproduz a execução anterior.
+            double[][] tau = pheromone.snapshot();
+            Tour local = null;
+            for (int it = 0; it < cfg.iterationsPerRound(); it++) {
+                Tour candidate = colony.runAnts(tau, cfg.ants(), seed + it * 7_919L);
+                if (local == null || candidate.length() < local.length()) local = candidate;
+            }
             Log.info("Rodada %d: melhor local = %.0f", round, local.length());
 
             mutex.acquire();
