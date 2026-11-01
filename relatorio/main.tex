@@ -1,8 +1,9 @@
 % Relatorio do Trabalho Pratico -- Computacao Distribuida (PUC Minas, 2026/2)
 %
-% ESTE ARQUIVO E UM ANDAIME: a estrutura, as figuras e a tabela estao prontas;
-% o texto de cada secao e escrito pelo grupo (o enunciado desconsidera texto
-% gerado automaticamente). Os marcadores \pendente{...} mostram o que falta.
+% TEXTO COMPLETO, 4 paginas. ATENCAO: o texto foi escrito com assistencia de IA
+% a pedido do grupo. O enunciado (docs/ENUNCIADO.md 5.1) desconsidera texto
+% praticamente gerado de forma automatica -- reescrever com palavras proprias
+% antes de qualquer entrega avaliada.
 %
 % Limite da Entrega 1: 4 paginas. Limite da Entrega 2: 6 paginas.
 % Template: modelo de artigo da SBC (sbc-template.sty vendorizado nesta pasta).
@@ -24,17 +25,15 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,calc}
 \usepackage{needspace}
+\usepackage{flafter} % float nunca aparece antes do ponto onde foi declarado
 
-% Marcador visivel de texto que ainda precisa ser escrito pelo grupo.
-% Troque para \pendentesfalse para ver o PDF sem os marcadores e medir o espaco livre
-% (foi assim que conferimos que ainda sobram ~1,8 pagina para a prosa).
+% Marcador de pendencia: hoje sem uso (o texto esta completo). Mantido para a
+% Entrega 2, quando houver secao nova a preencher. \pendentesfalse esconde.
 \newif\ifpendentes \pendentestrue
 \newcommand{\pendente}[1]{\ifpendentes\textcolor{red}{\textbf{[PENDENTE: #1]}}\fi}
 
-\sloppy
+% sem \sloppy: o texto justifica normalmente. Se aparecer Overfull \hbox, volte para \sloppy.
 
-% Título: sugestão. Se o grupo preferir outro, mantenha os quatro requisitos
-% (ACO, eleição, Lamport, exclusão mútua) — são o diferencial avaliado.
 \title{Col\^onia de Formigas Distribu\'ida para o Caixeiro-Viajante com Elei\c{c}\~ao de L\'ider, Rel\'ogio de Lamport e Exclus\~ao M\'utua}
 
 % R1: autores confirmados (o enunciado pede grupo de 4 a 5).
@@ -49,36 +48,32 @@ Belo Horizonte -- MG -- Brasil
 
 \maketitle
 
-% ======================= ROTEIRO COMPLETO: RESUMO =======================
-% Regra do template SBC: no máximo 10 linhas, na primeira página.
-% Orçamento nosso: 8 linhas (resumo + abstract consomem ~16 linhas do total).
-% 5 frases, nesta ordem (é o artigo inteiro em miniatura):
-%  1) CONTEXTO + PROBLEMA: colônia de formigas (ACO) para o caixeiro-viajante,
-%     problema NP-difícil resolvido por heurística; instância berlin52 (ótimo 7542).
-%  2) ABORDAGEM: cluster de nós Java simétricos que trocam mensagens por gRPC;
-%     a matriz de feromônio é replicada e só muda dentro de uma seção crítica.
-%  3) COORDENAÇÃO: líder eleito por Bully (detector de falha por heartbeat),
-%     relógio lógico de Lamport para ordenar pedidos e Ricart-Agrawala como
-%     exclusão mútua.
-%  4) RESULTADO, com número: 43 testes automatizados; réplicas convergem; chega
-%     a 7542 (o ótimo); failover do líder em ~10 s no perfil de LAN.
-%  5) CONCLUSÃO em uma frase: o que funcionou e o que fica para a próxima etapa
-%     (consenso para não confundir lento com morto).
-% NÃO use citação, figura ou sigla não explicada no resumo.
-% Escreva o resumo em português; o abstract é a tradução, não uma versão nova.
-% ========================================================================
-
 \begin{resumo}
-\pendente{resumo em portugu\^es, at\'e 8 linhas (5 frases: problema, abordagem, coordena\c{c}\~ao, n\'umeros, conclus\~ao)}
+Este trabalho apresenta uma colônia de formigas distribuída para o problema do
+caixeiro-viajante, executada por nós Java simétricos que trocam mensagens por gRPC. A matriz de
+feromônio é replicada e somente pode ser alterada dentro de uma seção crítica, cuja coordenação
+combina eleição de líder pelo algoritmo Bully, detecção de falha por \textit{heartbeat}, relógio
+lógico de Lamport e exclusão mútua de Ricart-Agrawala. Em ensaios com quatro nós e a instância
+\textit{berlin52}, as réplicas convergiram para matrizes idênticas e o \textit{cluster} atingiu a
+rota de 7542, que é o ótimo conhecido. O \textit{failover} do líder levou cerca de 10 s no perfil
+de rede local, e a primeira rodada após a queda caiu de 15,6 s para 0,56 s depois de corrigirmos o
+\textit{broadcast}. Os quatro requisitos operam de forma integrada; a limitação central --- não
+distinguir nó lento de nó morto --- fica para a próxima etapa.
 \end{resumo}
 
 \begin{abstract}
-% Tradução fiel do resumo, também até 8 linhas. Mesmos números.
-\pendente{abstract em ingl\^es, at\'e 8 linhas}
+This work presents a distributed ant colony for the traveling salesman problem, run by symmetric
+Java nodes that exchange messages over gRPC. The pheromone matrix is replicated and may only change
+inside a critical section, whose coordination combines leader election with the Bully algorithm,
+heartbeat-based failure detection, Lamport logical clocks and Ricart-Agrawala mutual exclusion. In
+trials with four nodes and the \textit{berlin52} instance, the replicas converged to identical
+matrices and the \textit{cluster} reached the 7542 tour, which is the known optimum. Leader
+failover took about 10 s on the local network profile, and the first round after the crash dropped
+from 15.6 s to 0.56 s after we fixed the \textit{broadcast}. The four requirements operate
+together; the central limitation --- not telling a slow node from a dead one --- is left for the
+next stage.
 \end{abstract}
 
-% Palavras-chave: 4 ou 5, separadas por ponto e vírgula, minúsculas.
-% As sugeridas cobrem os quatro requisitos; trocar só se o grupo mudar o foco.
 \noindent\textbf{Palavras-chave:} computa\c{c}\~ao distribu\'ida; col\^onia de formigas;
 elei\c{c}\~ao de l\'ider; exclus\~ao m\'utua; rel\'ogio l\'ogico
 
@@ -92,7 +87,7 @@ elei\c{c}\~ao de l\'ider; exclus\~ao m\'utua; rel\'ogio l\'ogico
 % Bibliografia manual (6 entradas) para compilar sem precisar do sbc.bst oficial.
 % Para usar BibTeX: baixe sbc.bst, troque este bloco por
 %   \bibliographystyle{sbc} \bibliography{referencias}
-\Needspace*{12\baselineskip} % nao deixa a lista de referencias quebrar entre paginas
+\Needspace*{11\baselineskip} % nao deixa a lista de referencias quebrar entre paginas
 \input{secoes/07-referencias}
 
 \end{document}

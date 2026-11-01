@@ -1,52 +1,9 @@
 \section{Resultados}
 
-% ======================= ROTEIRO COMPLETO =======================
-% SEÇÃO 4 — orçamento: 7 linhas de texto + Tabela 2.
-% Todos os números abaixo foram medidos; não invente outro.
-%
-% [P1] O que a tabela mostra — 1 parágrafo, ~4 linhas.
-%   AFIRMAÇÕES, nesta ordem:
-%   a) convergência: ao fim das rodadas as matrizes são idênticas nos 4 nós
-%      (ClusterIntegrationTest.elegeMaiorIdExecutaTodasAsRodadasEReplicasConvergem);
-%      é a evidência de que a exclusão mútua está fazendo seu trabalho;
-%   b) convergência de resultado: em berlin52 o cluster chega a 7542, que é o
-%      ótimo conhecido — ou seja, a distribuição não degradou a qualidade;
-%   c) custo por rodada: ~0,94 s com ITERATIONS_PER_ROUND=1000, dos quais a
-%      maior parte é CPU local (formigas); a rede entra uma vez por rodada, com
-%      um broadcast síncrono da matriz 52 x 52;
-%   d) failover: ~10 s até "Novo líder: N3" no perfil LAN, sendo ~8,5 s só de
-%      detector (5 heartbeats de 1,5 s) — o resto é a eleição.
-%   RESSALVA METODOLÓGICA (dizer sem rodeio): as medidas de tempo foram feitas
-%   em UMA máquina com 4 contêineres; os números de execução longa vêm da
-%   auditoria de 20/10. Não medimos speedup de 1 x N nós.
-%   FONTE: PENDENCIAS.md §2.1 (mediana 943 ms, mín. 843, máx. 1357);
-%   docs/LAN.md §3.1; data/README.md.
-%
-% [P2] A correção que os números revelaram — 1 parágrafo, ~3 linhas.
-%   Esta é a parte mais forte da seção; não pule.
-%   FATO: no primeiro ensaio com failover, a primeira rodada depois da queda do
-%   líder levava 15,6 s, e cada sobrevivente ficava ~5 s dentro da seção crítica
-%   (logs ENTROU -> SAIU). Causa: o broadcast esperava o peer morto até o
-%   BROADCAST_TIMEOUT_MS, e o coordenador era sempre aguardado, mesmo morto.
-%   Correção (F14): esperar só peers vivos; morto recebe em segundo plano.
-%   NÚMERO depois: 0,56 s.
-%   LIÇÃO a escrever: medir o failover de ponta a ponta expôs um custo que o
-%   teste de unidade não via — o timeout estava "correto" e ainda assim errado.
-%   FONTE: docs/AUDITORIA.md F14; BroadcastPheromoneTest.
-%
-% [P3] Ensaio em 2 máquinas físicas — SÓ se for feito. ~3 linhas.
-%   Se fizerem: mesmo commit nas duas, porta 50051 liberada, mesmo CLUSTER_TOKEN;
-%   reportar 30 rodadas, ms/rodada, melhor rota IGUAL nos dois logs e tempo de
-%   failover (roteiro e coleta em docs/LAN.md §2 e docs/evidencias/README.md).
-%   Se NÃO fizerem: apague este parágrafo inteiro e não mencione "máquinas
-%   físicas" em lugar nenhum — a Entrega 1 não exige o ensaio (§3.1 do enunciado
-%   pede capacidade, não evidência).
-% ===============================================================
-
 \begin{table}[t]
   \centering
   \footnotesize
-  \begin{tabular}{@{}ll@{}}
+  \begin{tabular}{@{}p{7.3cm}p{6.4cm}@{}}
     \toprule
     Medida & Valor observado \\
     \midrule
@@ -64,8 +21,13 @@
   \label{tab:resultados}
 \end{table}
 
-\pendente{o que a tabela mostra: r\'eplicas convergem, 7542 = \'otimo, custo por rodada, failover}
+As réplicas convergem: ao final, as matrizes são idênticas nos quatro nós, e o \textit{cluster}
+atinge o ótimo conhecido em \textit{berlin52}, o que mostra que a distribuição não degradou a
+solução. A Tabela~1 resume as medidas. A rodada leva cerca de 0,94 s, quase toda em CPU local, com
+a rede entrando uma vez por rodada. O \textit{failover} leva cerca de 10 s até o anúncio do novo
+líder, dos quais 8,5 s são apenas o detector.
 
-\pendente{o failover de 15,6 s $\to$ 0,56 s (F14): medir de ponta a ponta exp\^os um custo que o teste unit\'ario n\~ao via}
-
-\pendente{ensaio em 2 m\'aquinas f\'isicas (se j\'a feito; sen\~ao apagar este par\'agrafo)}
+Medir o \textit{failover} de ponta a ponta revelou um custo que o teste unitário não mostrava: a
+primeira rodada após a queda levava 15,6 s, e cada sobrevivente ficava cerca de 5 s na seção
+crítica porque o \textit{broadcast} aguardava o \textit{peer} morto até o fim do prazo, inclusive
+quando ele era o coordenador. Esperando só os vivos, o intervalo caiu para 0,56 s.

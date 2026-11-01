@@ -1,8 +1,11 @@
-# Relatório — andaime
+# Relatório — Entrega 1
 
-Estrutura do relatório da Entrega 1 (limite **4 páginas**) no modelo de artigo da SBC.
-O texto de cada seção é escrito pelo grupo: o enunciado desconsidera texto gerado
-automaticamente, então aqui só existem **estrutura, figuras, tabela e referências**.
+Relatório da Entrega 1 (limite **4 páginas**) no modelo de artigo da SBC, com texto completo.
+
+> **Aviso registrado:** o texto deste relatório foi escrito com assistência de IA a pedido
+> explícito do grupo, que assumiu o risco. O enunciado (`docs/ENUNCIADO.md` §5.1) diz que
+> entregas com texto praticamente gerado de forma automática **serão desconsideradas**.
+> Este texto deve ser reescrito com palavras próprias antes de qualquer entrega avaliada.
 
 ## Compilar
 
@@ -16,75 +19,49 @@ docker run --rm -v "$PWD":/w -w /w texlive/texlive:latest \
 O PDF sai em `relatorio/main.pdf`. Para limpar os auxiliares: `latexmk -C` (mesmo comando com `-C`
 no fim). Eles já estão no `.gitignore` da raiz.
 
-## O que está pronto e o que falta
+## O que existe
 
 | Arquivo | Estado |
 |---|---|
-| `main.tex` | Título, 4 autores, resumo/abstract e palavras-chave com roteiro completo (8 linhas cada) |
+| `main.tex` | Título, 4 autores, resumo (9 linhas), abstract (8 linhas), palavras-chave |
 | `sbc-template.sty` | Estilo oficial da SBC, vendorizado (cabeçalho original preservado) |
-| `secoes/01` a `06` | Tabelas/figuras prontos **e roteiro completo parágrafo por parágrafo**; prosa pendente |
-| `secoes/07-referencias` | 6 referências no formato SBC, escritas à mão |
-| `figuras/*.tex` | TikZ: arquitetura e sequência do Ricart-Agrawala (vetorial, sem PNG) |
+| `secoes/01-introducao` | Problema, por que distribuir, o que foi construído, 4 requisitos |
+| `secoes/02-arquitetura` | Visão geral e entidades, mensagens, uma rodada |
+| `secoes/03-requisitos` | gRPC, Bully, Lamport, Ricart-Agrawala |
+| `secoes/04-resultados` | Tabela 1 e a análise, incluindo o achado F14 |
+| `secoes/05-desafios` | F1 (não corrigido), F2/F3, F9 |
+| `secoes/06-papeis` | Divisão de trabalho em prosa |
+| `secoes/07-referencias` | 5 referências no formato SBC, escritas à mão |
+| `figuras/arquitetura.tex` | TikZ: entidades e mensagens (usada na Figura 1) |
+| `figuras/sequencia-ra.tex` | TikZ: Ricart-Agrawala — **não usada**, guardada para a Entrega 2 |
 
-### Como usar o roteiro completo de cada seção
+## Controle de páginas
 
-Cada arquivo de `secoes/` abre com um bloco marcado `% ===== ROTEIRO COMPLETO =====`.
-Ele cobre **todos os parágrafos** da seção, e cada parágrafo tem um bloco `[P1]`, `[P2]`...
-com: o que aquele parágrafo afirma, os fatos na ordem em que devem aparecer, os números
-exatos, o `arquivo:linha` de onde vieram e, às vezes, uma "frase-alvo" com o argumento.
+O PDF fecha em **4 páginas** com 1 figura, 1 tabela e 5 referências. A margem é apertada:
+acrescentar uma única frase foi suficiente para estourar para 5 páginas durante a edição.
 
-Nada fica por inventar: se um fato não está no roteiro, ele não deve entrar no texto.
-O roteiro **não** sai no PDF — é um `%` por linha.
+Se precisar de espaço:
 
-Fluxo por pessoa:
+1. cortar a `figuras/arquitetura.tex` (Figura 1) — libera ~13 linhas;
+2. cortar a Tabela 1 de resultados — libera ~11 linhas;
+3. encurtar o resumo/abstract (hoje 17 linhas somadas).
 
-1. abrir o arquivo da sua seção e ler o bloco;
-2. escrever **um parágrafo por bloco `[P*]`**, em prosa, seguindo a ordem dos fatos;
-3. apagar o bloco `% ROTEIRO` e os `\pendente{...}` correspondentes;
-4. compilar e conferir o número de páginas.
-
-Se um fato do roteiro estiver errado, corrija **no texto**, não no roteiro.
-
-### Orçamento de páginas (medido, não estimado)
-
-Compilando com os marcadores desligados, o andaime (títulos, Figura 1, Tabelas 1–3 e
-referências) ocupa **~2,55 páginas de 4** — sobram **~1,45 página**, ou ~70 linhas.
-
-O resumo e o abstract vão consumir ~16 linhas desse total, então o texto das cinco seções
-deve caber em **~55 linhas**. Os orçamentos nos roteiros somam ~57:
-
-| Seção | Linhas |
-|---|---|
-| 1. Introdução | 10 |
-| 2. Arquitetura | 13 (+ Figura 1 e Tabela 1) |
-| 3. Requisitos | 21 (+ Figura 2) |
-| 4. Resultados | 7 (+ Tabela 2) |
-| 5. Desafios | 8 |
-| 6. Papéis | tabela, sem prosa |
-
-**Se estourar:** a primeira coisa a cortar é a **Figura 2** (sequência do Ricart-Agrawala),
-que libera ~18 linhas; depois a Tabela 1. A ordem de prioridade é requisitos > resultados >
-arquitetura > introdução.
-
-Para medir de novo: troque `\newif\ifpendentes \pendentestrue` por `\pendentesfalse` no
-`main.tex` (hoje: 4 páginas com marcadores, 3 sem).
-
-Os marcadores vermelhos `[PENDENTE: ...]` aparecem no PDF de propósito: são o checklist visual do
-que ainda falta escrever. **Remova todos antes de entregar** (`grep -rn pendente secoes/`).
+Para medir: o `.sty` da SBC usa 12 pt com entrelinha de 14 pt, o que dá ~48 linhas por página.
 
 ## Por que TikZ em vez de exportar os Mermaid
 
 Os diagramas de `docs/algoritmos/*.md` são Mermaid e precisariam de Chromium (`mermaid-cli`) para
-virar PNG, o que daria imagem raster num artigo que é vetorial. As duas figuras aqui foram
-redesenhadas em TikZ: compilam junto, escalam sem perder nitidez e ficam no mesmo estilo do texto.
-Se preferir as versões originais, exporte com `npx -y @mermaid-js/mermaid-cli` e troque o
-`\input` por `\includegraphics`.
+virar PNG, o que daria imagem raster num artigo que é vetorial. A figura em uso foi redesenhada em
+TikZ: compila junto, escala sem perder nitidez e fica no mesmo estilo do texto. Se preferir as
+versões originais, exporte com `npx -y @mermaid-js/mermaid-cli` e troque o `\input` por
+`\includegraphics`.
 
 ## Bibliografia
 
 `secoes/07-referencias.tex` usa `thebibliography` escrito à mão, para compilar sem depender do
-`sbc.bst`. As mesmas 6 entradas estão em `referencias.bib`; para adotar BibTeX, veja o cabeçalho
-desse arquivo.
+`sbc.bst`. Todas as 5 entradas são citadas no texto (`\cite`): TSPLIB na introdução, ACO na
+introdução, Garcia-Molina no Bully, Lamport no relógio e Ricart-Agrawala na exclusão mútua.
+As mesmas entradas estão em `referencias.bib`; para adotar BibTeX, veja o cabeçalho desse arquivo.
 
 ## Template oficial
 
@@ -101,8 +78,8 @@ Se a SBC publicar uma versão nova do `.sty`, substitua o arquivo desta pasta pe
 
 1. ~~Autores~~ — fechado: Pedro Henrique Vilaça Valverde, Marcus Prado Silva,
    Gabriel Batista de Almeida e Eduardo Alves Salgado Lisboa Oliveira.
-2. **Módulo de Gabriel e Eduardo** — a Tabela 3 só tem o que o git comprova.
-3. **Data/formato da entrega** — confirmar no Canvas.
-4. **Texto** — uma seção por pessoa, a partir do roteiro de cada arquivo.
-5. **Ensaio em 2 máquinas** — confirmar os números da Tabela 2 e citar na §4.
-6. **Remover os marcadores `\pendente` e os roteiros** e conferir o limite de 4 páginas.
+2. **Reescrever o texto** com palavras do grupo — é o item que decide a nota (ver aviso no topo).
+3. **Confirmar a divisão de Gabriel e Eduardo** em §6: o texto assume B = ACO/rodadas e
+   C = eleição/detector, conforme o `TODO.md`.
+4. **Data/formato da entrega** — confirmar no Canvas.
+5. **Ensaio em 2 máquinas** — se for feito, acrescentar um parágrafo em §4 (hoje não menciona).
