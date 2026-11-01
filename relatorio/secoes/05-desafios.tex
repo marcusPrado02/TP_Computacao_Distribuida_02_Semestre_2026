@@ -1,41 +1,55 @@
 \section{Desafios e Problemas Encontrados}
 
-% ============================ ROTEIRO ============================
-% Fonte: docs/AUDITORIA.md (F1 a F13) e docs/ARQUITETURA.md §6.
-% Escolher 3 dos 4 e contar o que aconteceu; nao listar todos os achados.
-% Cada um rende 3-4 frases: sintoma -> causa -> o que foi feito -> o que ficou em aberto.
+% ======================= ROTEIRO COMPLETO =======================
+% SEÇÃO 5 — orçamento: 8 a 9 linhas de texto (3 desafios, ~2,5 linhas cada).
+% NÃO liste todos os achados (são 15 em docs/AUDITORIA.md). Escolha 3 e conte
+% cada um como: sintoma -> causa -> o que foi feito -> o que ficou em aberto.
+% Não repita F8 nem F14 aqui: já estão na §3.1 e na §4.
 %
-% [5.1 Lento nao e morto]  AUDITORIA F1, ARQUITETURA §6
-%  - Detector e por timeout: nao distingue no lento (GC, pico de carga) de no morto.
-%  - Para nao travar, falha conta como permissao -> dois nos podem entrar na SC juntos.
-%  - Reproduzido com dois RicartAgrawala reais, um REQUEST devolvendo false com o peer vivo.
-%  - Nao foi "corrigido": e limitacao fundamental em sistema assincrono; exige quorum/consenso
-%    (Entrega 2). Dizer isso explicitamente -- e o paragrafo que mostra maturidade.
+% [5.1 Lento não é morto]  ~3 linhas  (F1, crítica, NÃO corrigida)
+%   SINTOMA: dois nós entraram juntos na seção crítica com o outro vivo.
+%   CAUSA: o detector é por timeout. Quando o REQUEST falha ou estoura o prazo,
+%   o nó trata como permissão — é o que impede o cluster de travar quando um
+%   peer realmente morre. Mas o mesmo caminho dispara quando o peer só está
+%   lento (GC, pico de carga), e aí dois entram juntos.
+%   EVIDÊNCIA: reproduzido com dois RicartAgrawala reais, um REQUEST devolvendo
+%   false com o outro já dentro da SC.
+%   O QUE FICOU EM ABERTO: não "corrigimos" — em sistema assíncrono com
+%   detecção por timeout não há como distinguir lento de morto sem quórum ou
+%   consenso (2PC/Raft). É decisão de projeto, não descuido: preferimos
+%   disponibilidade a segurança estrita. Dizer isso explicitamente; é o
+%   parágrafo que mostra maturidade.
+%   FONTE: docs/AUDITORIA.md F1; docs/ARQUITETURA.md §6.
 %
-% [5.2 Peer morre depois do REQUEST]  F2/F3
-%  - Sintoma: acquire() ficava esperando para sempre (medido: ainda em WANTED apos 3 s).
-%  - Causa: REPLY perdido ou peer que caiu depois de receber o REQUEST.
-%  - Correcao: reenvio do pedido a cada 500 ms + recontato de peer que voltou (quarentena de 2 s).
-%  - Ganho colateral: derrubar um seguidor deixou de custar 30 s por rodada (F4).
+% [5.2 Peer que morre depois do REQUEST]  ~3 linhas  (F2 + F3, corrigidas)
+%   SINTOMA: acquire() ficava preso para sempre (medido: ainda em WANTED após 3 s).
+%   CAUSA: o peer recebeu o REQUEST e morreu antes do REPLY — ou o REPLY se
+%   perdeu. Como o nó espera N-1 permissões, uma perda basta para travar tudo.
+%   CORREÇÃO: reenvio do pedido a cada 500 ms (LIVENESS_POLL_MS) e recontato de
+%   peer que voltou, com quarentena de 2 s (F3) — antes, o peer recuperado
+%   nunca recebia o REQUEST seguinte.
+%   EFEITO COLATERAL BOM: a mesma mudança destravou a queda de seguidor, que
+%   custava 30 s de timeout por rodada (F4).
+%   FONTE: RicartAgrawala.java:39,93-99; testes peerQueCaiDepoisDeReceberRequestNaoTrava,
+%   pedidoReenviadoRecuperaReplyPerdido, peerQueVoltaEhRecontatadoNaProximaEntrada.
 %
-% [5.3 Matriz maior que o limite do gRPC]  F8
-%  - Sintoma: a partir de ~725 cidades o peer falhava com RESOURCE_EXHAUSTED e era marcado
-%    como morto (mensagem de 4,8 MB).
-%  - Correcao: 64 MiB no servidor e nos stubs -> cobre ~2900 cidades. Acima disso falha,
-%    porque nao ha chunking.
-%
-% [5.4 Configuracao divergente]  F9
-%  - Sintoma: token ou PEERS diferentes e cada no se elegia lider e rodava sozinho --
-%    split-brain silencioso, com apenas "inacessivel (UNAUTHENTICATED)" no log.
-%  - Correcao: handshake no startup confere token, remetente e o conjunto {self} U PEERS;
-%    erro fatal encerra o processo com codigo 2.
-%  - Em aberto: dois grupos que nao compartilham nenhum membro ainda nao sao detectados.
-% =================================================================
+% [5.3 Configuração divergente virava split-brain silencioso]  ~3 linhas  (F9)
+%   SINTOMA: token ou PEERS diferentes e cada nó se elegia líder e rodava o ACO
+%   sozinho. Nos logs, só "inacessível (UNAUTHENTICATED)" — nada indicava erro
+%   de configuração; o sistema "funcionava" com 4 clusters de 1 nó.
+%   CAUSA: nenhuma validação no startup; a falha de RPC era tratada como peer
+%   morto, que é um estado normal.
+%   CORREÇÃO: handshake na subida confere token, remetente e o conjunto
+%   completo {self} ∪ PEERS; divergência encerra o processo com código 2 e
+%   mensagem de erro fatal (HandshakeTest cobre os quatro casos).
+%   EM ABERTO: dois grupos que não compartilham NENHUM membro ainda não são
+%   detectados (cada um vê o outro como "inacessível").
+%   Frase-alvo: "o modo de falha mais perigoso não era cair: era continuar
+%   rodando errado".
+% ===============================================================
 
-\pendente{lento n\~ao \'e morto: falha por timeout conta como permiss\~ao (F1)}
+\pendente{lento n\~ao \'e morto: falha por timeout conta como permiss\~ao (F1, n\~ao corrigido, decis\~ao de projeto)}
 
-\pendente{peer que morre depois do REQUEST: acquire() travava (F2/F3)}
+\pendente{peer morre depois do REQUEST: acquire() preso; reenvio a cada 500 ms (F2/F3)}
 
-\pendente{matriz grande: limite de 4 MiB do gRPC (F8)}
-
-\pendente{configura\c{c}\~ao divergente = split-brain; handshake mata o processo (F9)}
+\pendente{configura\c{c}\~ao divergente = split-brain silencioso; handshake encerra com c\'odigo 2 (F9)}

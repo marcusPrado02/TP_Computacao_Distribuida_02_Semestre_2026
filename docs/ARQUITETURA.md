@@ -189,10 +189,11 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
 | `BullyElectionTest` | maior vivo vence, contestação de id menor |
 | `RoundWorkerTest` | rodada repetida não reaplica feromônio e responde ao coordenador |
 | `HandshakeTest` | classifica token errado (`AUTH`), remetente fora de PEERS (`PEERS`), conjunto de membros diferente (`PEERS`) e configuração correta (`OK`) |
+| `BroadcastPheromoneTest` | peer "buraco negro" (TCP aceito, sem resposta) não segura a SC depois da quarentena, nem quando é o coordenador da rodada (F14) |
 | `TspInstanceTest` | TSPLIB válido, outra seção (`DISPLAY_DATA_SECTION`), arquivo vazio, < 3 cidades, linha malformada, vizinho mais próximo |
 | `ClusterIntegrationTest` | 3 nós com gRPC real: elege N3, rodadas, réplicas idênticas, failover do líder, queda de seguidor sem travar, token/remetente recusados |
 
-Total: 40 testes (`mvn test` no container, ~9 s).
+Total: 43 testes (`mvn test` no container, ~10 s).
 
 ## 8. Parâmetros (variáveis de ambiente)
 

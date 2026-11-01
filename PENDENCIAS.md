@@ -1,14 +1,15 @@
 # Pendências — Entrega 1
 
 > Fotografia de **28/10/2026**, a partir do commit `176620a` (*Endurece o cluster para LAN…*);
-> **atualizada em 01/11/2026** (branch `entrega1/pendencias-finais`: 2.1, 2.2, 2.3, 2.4 e §4 resolvidos;
-> de quebra, correções F14 e F15 em `docs/AUDITORIA.md`).
+> **atualizada em 01/11/2026**, já com a `main` mesclada (`99d7525` + relatório):
+> 2.1, 2.2, 2.3 e 2.4 resolvidos; correções F14 e F15 em `docs/AUDITORIA.md`; andaime do
+> relatório e roteiros completos em `relatorio/`.
 > Este arquivo é a **lista de ação** (o que fazer, como verificar, quando está pronto).
 > O plano por pessoa continua em [`TODO.md`](TODO.md); o roteiro do ensaio físico, em
 > [`docs/LAN.md`](docs/LAN.md).
 
 **Resumo (01/11):** 0 bloqueadores técnicos. Falta: ensaio físico em 2 máquinas (1.2, recomendado),
-estudo do Bully por C (2.4, material pronto) e o relatório (§3). Nada de Entrega 2 começa antes disso.
+estudo do Bully por C (2.4, material pronto), o **texto** do relatório (§3) e o push da `main`.
 
 | # | Item | Dono (TODO.md) | Bloqueia a entrega? |
 |---|---|---|---|
@@ -22,17 +23,19 @@ estudo do Bully por C (2.4, material pronto) e o relatório (§3). Nada de Entre
 
 ## 0. O que já está pronto (não refazer)
 
-- Núcleo distribuído: gRPC + streaming de feromônio, eleição Bully com detector de líder,
+- Núcleo distribuído: gRPC (8 RPCs unários, sem streaming), eleição Bully com detector de líder,
   relógio de Lamport, Ricart-Agrawala, formigas/rodadas, réplica da matriz de feromônio.
-- **43 testes verdes** em 12 classes (`mvn test`, 01/11): `RicartAgrawalaTest` (11),
-  `RicartAgrawalaSafetyTest` (1), `NodeConfigTest` (7), `TspInstanceTest` (6), `PheromoneMatrixTest` (4),
-  `ClusterIntegrationTest` (4), `BullyElectionTest` (3), `LamportClockTest` (2), `AntColonyTest` (1),
-  `RoundWorkerTest` (2), `HandshakeTest` (1), `BroadcastPheromoneTest` (1).
+- **43 testes verdes** em 12 classes (`mvn test`, 01/11, recontado após o merge `99d7525`):
+  `RicartAgrawalaTest` (11), `RicartAgrawalaSafetyTest` (1), `NodeConfigTest` (7), `TspInstanceTest` (6),
+  `PheromoneMatrixTest` (4), `ClusterIntegrationTest` (4), `BullyElectionTest` (3), `LamportClockTest` (2),
+  `AntColonyTest` (1), `RoundWorkerTest` (2), `HandshakeTest` (1), `BroadcastPheromoneTest` (1).
 - Ensaio local que imita LAN: `docker-compose.lan.yml` (IPs fixos), timeouts por env,
-  barreira `PEER_WAIT_MS`, broadcast que pula peer morto.
+  barreira `PEER_WAIT_MS`, broadcast que espera **só** peer vivo (F14).
+- `data/berlin52.tsp` (TSPLIB, ótimo 7542) e `ITERATIONS_PER_ROUND` (rodada de ~1 s).
 - Handshake de configuração no startup (token, remetente e conjunto `{self} ∪ PEERS`).
-- Docs: `docs/ARQUITETURA.md` (com limitações conhecidas §6), `docs/LAN.md`, `docs/AUDITORIA.md`,
-  `docs/ENUNCIADO.md`, `README.md`.
+- Docs: `docs/ARQUITETURA.md` (com limitações conhecidas §6), `docs/LAN.md`, `docs/AUDITORIA.md`
+  (F1–F15), `docs/ENUNCIADO.md`, `README.md`.
+- Relatório: andaime no template SBC + roteiro completo por seção em `relatorio/`. A prosa é do grupo.
 
 > Sem `mvn`/`java` no `PATH` desta máquina? Rode a suíte dentro da imagem de build:
 > ```bash
@@ -43,8 +46,9 @@ estudo do Bully por C (2.4, material pronto) e o relatório (§3). Nada de Entre
 
 ### 1.1 Reconciliar `main` com `origin/entrega1/validacoes`
 
-- [x] **Feito em `3290e09`** (merge `--no-ff` com os 3 conflitos resolvidos; suíte de 40 testes verde;
-  compose LAN com 4 nós, barreira e failover N4 → N3 em ~7,5 s).
+- [x] **Feito em `3290e09`** (merge `--no-ff` com os 3 conflitos resolvidos; suíte de 40 testes verde
+  na época — hoje 43; compose LAN com 4 nós, barreira e failover N4 → N3 em ~7,5 s no perfil antigo,
+  ~10 s com `RPC_TIMEOUT_MS=1500`).
 
 Três commits de 20/10 (`e46a3a0`, `8f3ba03`, `ee09e5d`) **nunca entraram na `main`**. Eles contêm
 trabalho que a entrega usa: parser TSPLIB em `TspInstance`, validação de token/membros no startup
@@ -80,7 +84,7 @@ O enunciado (`docs/ENUNCIADO.md` §3.1) pede que o sistema "possa ser executado 
 conectadas a uma rede local" — é requisito de **capacidade**, não de evidência. A Entrega 1 é só o
 relatório de 4 páginas; a demonstração ao vivo é da **Entrega 2**. Então o ensaio físico **não
 bloqueia** esta entrega, e a validação já registrada em Docker é forte (`docs/AUDITORIA.md`: 38 testes
-na época, hoje 40; 4 nós no compose, 4000 rodadas, falha de líder e de seguidor).
+na época, hoje 43; 4 nós no compose, 4000 rodadas, falha de líder e de seguidor).
 
 Ainda assim vale ~30 minutos: fecha a ressalva anotada no topo de `docs/LAN.md` ("a evidência que
 conta é o cluster rodando em máquinas diferentes") e protege contra a pergunta "isso só roda em
@@ -178,9 +182,10 @@ comparável ao ótimo conhecido (7542 para `berlin52`, como sanity check, não c
   corrigido (F14 em `docs/AUDITORIA.md`), agora **0,56 s**. Tempos no perfil LAN: `Novo líder: N3`
   em ~10 s, rodada 12 começa em ~12 s. Falta só **ensaiar a fala** (C).
 
-Cena: cluster rodando → `docker compose stop node4` (ou fechar a máquina) → em ~5 s os logs mostram
-`Líder N4 não responde há 3 heartbeats` e `Novo líder: N3`; a rodada seguinte sai com `[1, 2, 3]`
-e o relógio de Lamport continua crescendo. Ensaiar o timing para não ficar 30 s em silêncio na
+Cena: cluster rodando → `docker compose stop -t 0 node4` (ou fechar a máquina) → em ~2 s os peers
+logam `N4 inacessível (DEADLINE_EXCEEDED)`, em ~8,5 s `Líder N4 não responde há 5 heartbeats;
+iniciando eleição` e em ~10 s `Novo líder: N3`; a rodada seguinte sai com `[1, 2, 3]`
+e o relógio de Lamport continua crescendo. Ensaiar o timing para não ficar em silêncio na
 apresentação (ver 2.1).
 
 **Pronto quando:** o roteiro está no `docs/LAN.md` §3 ou no relatório, com comandos exatos e
@@ -193,7 +198,7 @@ o tempo esperado de cada passo.
   tempo" (Q9) e "por que eleição e detector são separados" (Q10). Falta C estudar.
 
 Pontos que a banca costuma cobrar: quem dispara a eleição, o que acontece com id maior/menor,
-o que é `LeaderMonitor` (3 heartbeats) e por que eleição e detector são separados.
+o que é `LeaderMonitor` (5 heartbeats perdidos) e por que eleição e detector são separados.
 
 **Pronto quando:** C explica o fluxo em 2 minutos e responde "e se dois nós iniciarem eleição ao
 mesmo tempo?".
@@ -211,7 +216,7 @@ cd relatorio && docker run --rm -v "$PWD":/w -w /w texlive/texlive:latest \
 - [x] Template SBC vendorizado (`relatorio/sbc-template.sty`) + `main.tex` com a estrutura
 - [x] Título, 4 autores, resumo/abstract e palavras-chave com roteiro
 - [x] Figuras vetoriais em TikZ: arquitetura e sequência do Ricart-Agrawala (`relatorio/figuras/`)
-- [x] Tabela de mensagens (fato, extraído do `node.proto`) e tabela de resultados com os números medidos
+- [x] Tabela de mensagens (fato, extraído do `node.proto`), tabela de resultados e tabela de papéis
 - [x] 6 referências no formato SBC (`secoes/07-referencias.tex` + `referencias.bib`)
 - [x] `docs/evidencias/README.md` com o que coletar e como nomear
 
@@ -224,28 +229,32 @@ Pendente (o que ainda falta para a entrega):
   handshake, TSPLIB) e Marcus (Ricart-Agrawala, testes, docs), porque é o que o git comprova.
   Confirmar quem ficou com B (ACO/rodadas) e C (Bully/detector) e preencher as duas linhas.
 - [ ] **R2 — Data e formato:** confirmar no Canvas o prazo e se é upload de PDF.
-- [x] **R3a — Roteiro factual por seção:** cada `secoes/0X.tex` (e o resumo no `main.tex`) abre com
-  um bloco `% ROTEIRO` com os fatos, os números e o `arquivo:linha` de origem — e, em alguns,
-  uma "frase-alvo". Não sai no PDF (é comentário). O texto nasce dele.
+- [x] **R3a — Roteiro completo:** cada `secoes/0X.tex` (e o resumo no `main.tex`) tem um bloco
+  `% ROTEIRO` que cobre **todos** os parágrafos da seção, com: a afirmação do parágrafo, os
+  números/fatos com `arquivo:linha` e o orçamento de linhas. Não sai no PDF (é comentário).
+  Nenhum parágrafo do relatório fica "a inventar": tudo está especificado.
 - [ ] **R3b — Transformar o roteiro em prosa**, uma pessoa por bloco (mapa no `relatorio/README.md`):
   - [ ] Introdução: problema, ACO/TSP, 4 requisitos atendidos (o enunciado exige 2) — B
   - [ ] Arquitetura: entidades, mensagens, uma rodada — A
   - [ ] gRPC + 64 MiB + token — A
   - [ ] Bully + detector (5 heartbeats) + failover — C
   - [ ] Lamport + Ricart-Agrawala + `PheromoneMatrixTest` (sem SC as réplicas divergem) — D
-  - [ ] Desafios: F1/F2-F3/F8/F9 de `docs/AUDITORIA.md` (lento × morto é o melhor argumento)
-- [ ] **R4 — Resultados:** confirmar a Tabela 2 com o ensaio de 2 máquinas (ver `docs/evidencias/`)
-  e escrever a análise; se o ensaio não for feito, remover a frase sobre máquinas físicas.
-- [ ] **R5 — Fechamento:** remover todos os marcadores (`grep -rn pendente relatorio/secoes/`),
-  conferir ≤4 páginas e revisar o texto (IA só para revisão).
+  - [ ] Desafios: F1/F2-F3/F8/F9/F14 de `docs/AUDITORIA.md` (lento × morto é o melhor argumento)
+- [ ] **R4 — Resultados:** a Tabela 2 já está com os números de 01/11 (43 testes, rodada de ~0,85 s
+  com `ITERATIONS_PER_ROUND=1000`, berlin52 no ótimo 7542, failover ~10 s). Falta só decidir se o
+  ensaio de 2 máquinas entra (ver `docs/evidencias/`); se não, remover a frase sobre máquinas físicas.
+- [ ] **R5 — Fechamento:** remover todos os marcadores e os blocos `% ROTEIRO`
+  (`grep -rn "pendente\|ROTEIRO" relatorio/`), conferir ≤4 páginas e revisar o texto (IA só para revisão).
 
 > Lembrete do enunciado: IA só para revisar/corrigir texto. Texto praticamente gerado por IA é desconsiderado.
 
 ## 4. Higiene da entrega
 
-- [x] **Push da `main`:** feito (`origin/main` em `4591109`); `entrega1/implementacao` e
-  `entrega1/validacoes` já apagados no GitHub.
-- [x] Merge de `entrega1/validacoes` (`3290e09`) e de `entrega1/pendencias` (`56e5955`) na `main`.
+- [ ] **Push da `main`:** `origin/main` está em `99d7525` (PR #3 do Marcus); os commits do
+  relatório (`5bf8d60`, `b4809fc`, `673da5c` + merge `3eeaf76`) estão **só locais**. Falta `git push`.
+- [x] Merge de `entrega1/validacoes` (`3290e09`), de `entrega1/pendencias` (`56e5955`),
+  de `entrega1/implementacao` (`4591109`) e de `entrega1/pendencias-finais` (PR #3, `3eeaf76`).
+- [ ] Apagar `entrega1/pendencias-finais` no GitHub (já mesclado via PR #3).
 - [ ] Confirmar **mesmo commit** em todas as máquinas do ensaio (`git rev-parse --short HEAD`).
 - [ ] `git status` limpo em cada máquina; `dependency-reduced-pom.xml` e `target/` já estão ignorados.
 - [ ] Anotar versões usadas no relatório: `java -version`, `docker --version`, `docker compose version`.

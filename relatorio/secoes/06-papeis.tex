@@ -1,15 +1,37 @@
 \section{Papel de Cada Aluno}
 
-% ============================ ROTEIRO ============================
-% Esta secao nao precisa de prosa: basta preencher a tabela.
-% Regra: cada linha diz o que a pessoa fez de concreto -- "projetou o protocolo X",
-% "implementou Y.java", "escreveu a Secao 3", "rodou o ensaio na LAN".
-% Evitar "participou das reunioes".
-% Mapeamento do TODO.md: A = infra/gRPC/Docker/LAN, B = ACO/rodadas,
-% C = eleicao + detector, D = Lamport + Ricart-Agrawala.
-% Quem nao aparece no git pode ter feito: revisao do texto, testes manuais, figuras,
-% apresentacao -- descrever isso, porque a arguicao cobra o que a pessoa sabe explicar.
-% =================================================================
+% ======================= ROTEIRO COMPLETO =======================
+% SEÇÃO 6 — não precisa de prosa: só a Tabela 3 preenchida. ~1/4 de página.
+%
+% REGRA: cada linha diz o que a pessoa fez de CONCRETO — projetou X,
+% implementou Y.java, escreveu a Seção Z, rodou o ensaio da LAN, montou as
+% figuras, revisou o texto. Evite "participou das reuniões" e "ajudou no geral":
+% não informa nada e a arguição cobra o que a pessoa sabe explicar.
+%
+% NÃO atribua código que a pessoa não escreveu: o professor pode pedir para ela
+% explicar a linha. Se a contribuição foi revisão/teste/figura/texto, escreva
+% isso — é contribuição legítima e defensável.
+%
+% LINHAS JÁ PREENCHIDAS (comprovadas pelo git):
+%  - Pedro Henrique Vilaça Valverde: IPs fixos e timeouts de LAN, handshake de
+%    token no startup, parser TSPLIB, docs ENUNCIADO/AUDITORIA.
+%    FONTE: git log --author="Pedro" --stat.
+%  - Marcus Prado Silva: implementação do Ricart-Agrawala e testes de integração,
+%    documentação por classe/algoritmo, script ./tp.
+%    FONTE: git log --author="Marcus" --stat.
+%
+% LINHAS A FECHAR (R1b): confirmar quem ficou com B e com C no TODO.md.
+%  - B = ACO/TSP e rodadas: candidatos a citar — AntColony/PheromoneMatrix/
+%    RoundWorker, calibragem de alpha/beta/rho, escolha da instância (berlin52),
+%    ITERATIONS_PER_ROUND.
+%  - C = eleição + detector: candidatos a citar — BullyElection, LeaderMonitor,
+%    o roteiro cronometrado de failover (docs/LAN.md §3.1).
+%  - A = infra/gRPC/Docker/LAN e D = Lamport + Ricart-Agrawala, se a divisão do
+%    TODO.md não mudou.
+%  Se a pessoa não commitou, escrever o que ela realmente fez (ex.: "escreveu a
+%  Seção 4 e rodou o ensaio de 2 máquinas", "revisou o texto e montou a
+%  apresentação"). Não deixar célula vazia.
+% ===============================================================
 
 \begin{table}[ht]
   \centering

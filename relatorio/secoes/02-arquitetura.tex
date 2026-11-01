@@ -1,33 +1,60 @@
 \section{Arquitetura do Sistema}
 
-% ============================ ROTEIRO ============================
-% Fontes: docs/ARQUITETURA.md §1-4, docs/rede-grpc.md, docs/rodadas.md, docs/LAN.md
+% ======================= ROTEIRO COMPLETO =======================
+% SEÇÃO 2 — orçamento: 13 linhas de texto + Figura 1 + Tabela 1.
+% Cada bloco [P*] vira UM parágrafo. Ao terminar, apague este bloco.
 %
-% [2.1 Visao geral -- 1 paragrafo]
-%  - Mesmo binario em todos os nos; o papel (lider ou trabalhador) vem da eleicao em tempo
-%    de execucao, nao da configuracao. Configuracao so define NODE_ID e PEERS
-%    (src/main/java/br/pucminas/cd/aco/config/NodeConfig.java:15-29).
-%  - Frase-alvo: "Nao existe no mestre: qualquer no pode assumir a coordenacao."
+% [P1] Visão geral — 1 parágrafo, ~2 linhas (antes da Figura 1).
+%   FATOS: todos os nós executam o MESMO binário; o papel (líder ou trabalhador)
+%   não está na configuração, é decidido em tempo de execução pela eleição.
+%   A configuração só diz quem é o nó (NODE_ID) e quem são os outros (PEERS).
+%   Frase-alvo: "Não existe nó mestre: qualquer nó pode assumir a coordenação."
+%   FONTE: NodeConfig.java:17-40; docs/ARQUITETURA.md §1.
+%   EVITAR: chamar de "servidor" e "cliente" — todos são os dois.
 %
-% [2.2 Entidades -- 1 paragrafo]
-%  - RoundCoordinator (lider): dispara StartRound e espera RoundDone (round/RoundCoordinator.java:62-90).
-%  - RoundWorker (todo no): formigas + seccao critica + avisa quem coordenou (round/RoundWorker.java:69-105).
-%  - LeaderMonitor: heartbeat de 1 s, 5 faltas disparam eleicao (election/LeaderMonitor.java:21,37).
-%  - Suporte: LamportClock, RicartAgrawala, PeerNetwork (cliente) e NodeServiceImpl (servidor).
+% [P2] Entidades — 1 parágrafo, ~4 linhas (§2.1).
+%   FATOS, na ordem em que aparecem na Figura 1:
+%   - RoundCoordinator (só no líder): incrementa a rodada, envia StartRound e
+%     espera os RoundDone; timeout de 30 s por rodada (RoundCoordinator.java:34,62-78).
+%   - RoundWorker (TODO nó, inclusive o líder): roda as formigas, entra na seção
+%     crítica, propaga a matriz e responde a quem iniciou a rodada (RoundWorker.java:82-107).
+%   - LeaderMonitor: heartbeat de 1 s no líder; 5 faltas seguidas disparam eleição
+%     (LeaderMonitor.java:21,37,63).
+%   - Suporte: LamportClock, RicartAgrawala, PeerNetwork (lado cliente) e
+%     NodeServiceImpl + ClusterAuth (lado servidor).
+%   PONTO a explicar: o detector é separado do algoritmo de eleição de propósito —
+%   um diz QUANDO desconfiar, o outro decide QUEM assume.
 %
-% [2.3 Mensagens -- 1 paragrafo + Tabela 1]
-%  - Oito RPCs unarios em src/main/proto/node.proto:18-36; sem streaming.
-%  - Todo cabecalho leva sender_id e lamport (PeerNetwork.header()); o token vai no metadata
-%    "x-cluster-token" e e checado no interceptor antes do handler (rpc/ClusterAuth.java:15-46).
-%  - Por que um servico unico: um canal por peer serve eleicao, mutex e rodadas.
+% [P3] Mensagens — 1 parágrafo, ~3 linhas (§2.2, conversa com a Tabela 1).
+%   FATOS: oito RPCs unários em um único serviço NodeService (node.proto:14-36);
+%   não usamos streaming — toda interação cabe em requisição/resposta.
+%   Todo cabeçalho carrega sender_id e o carimbo de Lamport; o token do cluster
+%   vai no metadata "x-cluster-token" e é conferido por um interceptor ANTES do
+%   handler, que devolve UNAUTHENTICATED (ClusterAuth.java:15-46).
+%   POR QUE UM SERVIÇO ÚNICO: um canal por peer serve eleição, mutex e rodadas;
+%   menos conexões e o mesmo deadline para todos os módulos.
+%   EVITAR: descrever cada RPC de novo (a tabela já faz isso).
 %
-% [2.4 Uma rodada -- 1 paragrafo]
-%  - Semente distinta por (no, rodada): RoundWorker.java:82 -> mesma config reproduz a execucao.
-%  - Formigas fora da seccao critica; dentro: evaporar/depositar + broadcast sincrono
-%    (RoundWorker.java:86-97; PeerNetwork.java:245-266).
-%  - Lider espera 30 s por rodada (RoundCoordinator.java:34) e, so na rodada 1, espera todos
-%    os peers responderem (PEER_WAIT_MS) para a ordem de subida nao importar (RoundCoordinator.java:73).
-% =================================================================
+% [P4] Uma rodada — 1 parágrafo, ~4 linhas (§2.3).
+%   FATOS, nesta ordem (é o fluxo que a banca cobra):
+%   1) semente distinta por (nó, rodada): tspSeed*1000003 + round*101 + nodeId
+%      (RoundWorker.java:82) — mesma configuração reproduz a mesma execução;
+%   2) ITERATIONS_PER_ROUND lotes de formigas sobre o MESMO snapshot, ficando com
+%      a melhor rota; a iteração 0 usa a semente original, então o padrão (1)
+%      reproduz o comportamento anterior (RoundWorker.java:88-90);
+%   3) só depois vem o custo distribuído: mutex.acquire() (Ricart-Agrawala),
+%      evaporar + depositar, broadcast síncrono da matriz, release()
+%      (RoundWorker.java:94-105);
+%   4) RoundDone volta para quem enviou o StartRound, não para "o líder"
+%      (RoundWorker.java:116) — se a eleição mudou no meio, a resposta ainda
+%      chega a quem está esperando.
+%   ARGUMENTO DE PROJETO (dizer explicitamente): a parte cara (formigas) roda
+%   fora da seção crítica e em paralelo em todos os nós; dentro dela fica só a
+%   escrita na matriz. E o broadcast espera apenas peers VIVOS: peer morto
+%   recebe em segundo plano, senão um líder caído no meio da rodada faria cada
+%   nó da fila gastar o timeout inteiro na seção crítica (F14, §5).
+%   FONTE: RoundWorker.java:82-107; PeerNetwork.java:240-270.
+% ===============================================================
 
 \pendente{vis\~ao geral: N n\'os sim\'etricos, mesmo bin\'ario, papel definido pela elei\c{c}\~ao}
 
@@ -42,11 +69,11 @@
 
 \subsection{Entidades e pap\'eis}
 
-\pendente{l\'ider, trabalhador, detector de l\'ider e m\'odulos de suporte}
+\pendente{l\'ider (RoundCoordinator), trabalhador (RoundWorker), detector (LeaderMonitor) e m\'odulos de suporte}
 
 \subsection{Mensagens}
 
-% Tabela factual extraida de src/main/proto/node.proto e de rpc/PeerNetwork.
+% Tabela factual extraída de src/main/proto/node.proto e de rpc/PeerNetwork.
 \begin{table}[ht]
   \centering
   \footnotesize
@@ -67,8 +94,8 @@
   \label{tab:mensagens}
 \end{table}
 
-\pendente{por que um servi\c{c}o \'unico e o que vai no cabe\c{c}alho}
+\pendente{por que um servi\c{c}o \'unico, e o que vai no cabe\c{c}alho (sender\_id, lamport, token)}
 
 \subsection{Uma rodada}
 
-\pendente{formigas $\to$ se\c{c}\~ao cr\'itica (atualiza + propaga) $\to$ RoundDone; o que roda fora da SC}
+\pendente{formigas (ITERATIONS\_PER\_ROUND) $\to$ se\c{c}\~ao cr\'itica (atualiza + propaga) $\to$ RoundDone para quem coordenou}

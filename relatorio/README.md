@@ -20,24 +20,54 @@ no fim). Eles já estão no `.gitignore` da raiz.
 
 | Arquivo | Estado |
 |---|---|
-| `main.tex` | Título, 4 autores, resumo/abstract e palavras-chave com roteiro |
+| `main.tex` | Título, 4 autores, resumo/abstract e palavras-chave com roteiro completo (8 linhas cada) |
 | `sbc-template.sty` | Estilo oficial da SBC, vendorizado (cabeçalho original preservado) |
-| `secoes/01` a `06` | Tabelas/figuras prontos **e um roteiro factual** no topo do arquivo; prosa pendente |
+| `secoes/01` a `06` | Tabelas/figuras prontos **e roteiro completo parágrafo por parágrafo**; prosa pendente |
 | `secoes/07-referencias` | 6 referências no formato SBC, escritas à mão |
 | `figuras/*.tex` | TikZ: arquitetura e sequência do Ricart-Agrawala (vetorial, sem PNG) |
 
-### Como usar o roteiro de cada seção
+### Como usar o roteiro completo de cada seção
 
-Cada arquivo de `secoes/` abre com um bloco de comentários marcado `% ==== ROTEIRO ====`.
-Ali estão os **fatos** que a seção precisa afirmar — com número e `arquivo:linha` de onde
-veio — e, em alguns blocos, uma "frase-alvo" que resume o argumento. O roteiro **não** está
-no PDF: é um `%` para cada linha.
+Cada arquivo de `secoes/` abre com um bloco marcado `% ===== ROTEIRO COMPLETO =====`.
+Ele cobre **todos os parágrafos** da seção, e cada parágrafo tem um bloco `[P1]`, `[P2]`...
+com: o que aquele parágrafo afirma, os fatos na ordem em que devem aparecer, os números
+exatos, o `arquivo:linha` de onde vieram e, às vezes, uma "frase-alvo" com o argumento.
 
-Fluxo por pessoa: ler o roteiro → escrever 2 a 4 frases por bloco → apagar o roteiro →
-compilar. Se um fato do roteiro estiver errado, corrija **no texto**, não no roteiro.
+Nada fica por inventar: se um fato não está no roteiro, ele não deve entrar no texto.
+O roteiro **não** sai no PDF — é um `%` por linha.
 
-Para medir o espaço livre sem os marcadores: troque `\newif\ifpendentes \pendentestrue` por
-`\pendentesfalse` no `main.tex` (hoje: 4 páginas com marcadores, 3 sem).
+Fluxo por pessoa:
+
+1. abrir o arquivo da sua seção e ler o bloco;
+2. escrever **um parágrafo por bloco `[P*]`**, em prosa, seguindo a ordem dos fatos;
+3. apagar o bloco `% ROTEIRO` e os `\pendente{...}` correspondentes;
+4. compilar e conferir o número de páginas.
+
+Se um fato do roteiro estiver errado, corrija **no texto**, não no roteiro.
+
+### Orçamento de páginas (medido, não estimado)
+
+Compilando com os marcadores desligados, o andaime (títulos, Figura 1, Tabelas 1–3 e
+referências) ocupa **~2,55 páginas de 4** — sobram **~1,45 página**, ou ~70 linhas.
+
+O resumo e o abstract vão consumir ~16 linhas desse total, então o texto das cinco seções
+deve caber em **~55 linhas**. Os orçamentos nos roteiros somam ~57:
+
+| Seção | Linhas |
+|---|---|
+| 1. Introdução | 10 |
+| 2. Arquitetura | 13 (+ Figura 1 e Tabela 1) |
+| 3. Requisitos | 21 (+ Figura 2) |
+| 4. Resultados | 7 (+ Tabela 2) |
+| 5. Desafios | 8 |
+| 6. Papéis | tabela, sem prosa |
+
+**Se estourar:** a primeira coisa a cortar é a **Figura 2** (sequência do Ricart-Agrawala),
+que libera ~18 linhas; depois a Tabela 1. A ordem de prioridade é requisitos > resultados >
+arquitetura > introdução.
+
+Para medir de novo: troque `\newif\ifpendentes \pendentestrue` por `\pendentesfalse` no
+`main.tex` (hoje: 4 páginas com marcadores, 3 sem).
 
 Os marcadores vermelhos `[PENDENTE: ...]` aparecem no PDF de propósito: são o checklist visual do
 que ainda falta escrever. **Remova todos antes de entregar** (`grep -rn pendente secoes/`).
