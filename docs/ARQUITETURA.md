@@ -160,7 +160,7 @@ Resumo (detalhes, motivação e testes em [`tolerancia-a-falhas.md`](tolerancia-
 
 > Atualizado na Entrega 2. Itens ~~riscados~~ foram tratados; ver [`tolerancia-a-falhas.md`](tolerancia-a-falhas.md) §2.
 
-- ~~Falha isolada conta como permissão~~ → agora só peer **suspeito** (sem contato há uma janela) conta (F1/F2).
+- ~~Falha isolada conta como permissão~~ → agora só peer **suspeito** (tentativas de contato falhando há uma janela) conta (F1/F2).
   Continua valendo: **detector de falhas é por timeout.** Se o peer apenas estava lento
   (GC, pico de carga), ele pode entrar na SC ao mesmo tempo que quem o considerou morto. Reproduzido:
   um REQUEST que devolve `false` com o peer vivo coloca os dois na seção crítica. Não existe detector
@@ -219,10 +219,10 @@ Resumo (detalhes, motivação e testes em [`tolerancia-a-falhas.md`](tolerancia-
 
 | `VersionedReplicaTest` | versão, UPDATE atrasado rejeitado, conflito detectado e convergente |
 | `CheckpointTest` | persistência atômica, arquivo de outra instância/truncado ignorado |
-| `SuspicionTest` | falha isolada de peer não suspeito não vira permissão (regressão do bug de backoff) |
+| `SuspicionTest` | falha isolada de peer não suspeito não vira permissão (regressão do bug de backoff); silêncio entre peers vivos também não |
 | `FaultToleranceIntegrationTest` | nó que volta sincroniza; novo líder retoma e conclui; cluster reinicia do checkpoint |
 
-Total: 59 testes (`mvn test`).
+Total: 62 testes (`mvn test`).
 
 ## 8. Parâmetros (variáveis de ambiente)
 

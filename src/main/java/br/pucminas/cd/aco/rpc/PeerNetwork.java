@@ -78,6 +78,9 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     /** Resultado do handshake de configuração (heartbeat usado como probe no startup). */
     public enum HandshakeResult { OK, UNREACHABLE, AUTH, PEERS, OTHER }
 
+    /** Primeira e última tentativa que falhou desde o último contato bem-sucedido, em ms. */
+    private record FailureStreak(long since, long last) {}
+
     /** Limite de mensagem gRPC. O padrão (4 MiB) estoura a matriz a partir de ~725 cidades. */
     public static final int MAX_MESSAGE_BYTES = 64 * 1024 * 1024;
 
@@ -92,9 +95,12 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     private final Set<Integer> alive = ConcurrentHashMap.newKeySet();
     /** Instante a partir do qual vale a pena tentar de novo um peer marcado como inacessível. */
     private final Map<Integer, Long> retryAfter = new ConcurrentHashMap<>();
-    /** Último contato bem-sucedido com cada peer (chamada de saída ou mensagem recebida), em ms. */
-    private final Map<Integer, Long> lastHeard = new ConcurrentHashMap<>();
-    /** Sem contato há mais que isto = suspeito de ter caído (ver {@link #isSuspected}). */
+    /**
+     * Sequência atual de falhas de cada peer; some no primeiro contato bem-sucedido (chamada de
+     * saída ou mensagem recebida).
+     */
+    private final Map<Integer, FailureStreak> failing = new ConcurrentHashMap<>();
+    /** Falhando há mais que isto, sem contato no meio = suspeito de ter caído (ver {@link #isSuspected}). */
     private final long suspectAfterMs;
     /** Config divergente é erro fatal; o Node instala o handler e encerra o processo. */
     private volatile Consumer<String> configErrorHandler = message -> {};
@@ -116,7 +122,6 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
         this.broadcastTimeoutMs = broadcastTimeoutMs;
         this.heartbeatTimeoutMs = Math.max(HEARTBEAT_MIN_TIMEOUT_MS, fastTimeoutMs);
         this.suspectAfterMs = Math.max(SUSPECT_MIN_MS, 3 * fastTimeoutMs);
-        long now = System.currentTimeMillis();
         peers.forEach((id, address) -> {
             ManagedChannel channel = ManagedChannelBuilder.forTarget(address).usePlaintext().build();
             channels.put(id, channel);
@@ -125,9 +130,6 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
                     .withMaxOutboundMessageSize(MAX_MESSAGE_BYTES)
                     .withInterceptors(ClusterAuth.clientInterceptor(clusterToken)));
             alive.add(id);
-            // Começa "ouvido agora": um peer que ainda está subindo tem uma janela inteira para
-            // responder antes de ser dado como morto.
-            lastHeard.put(id, now);
         });
     }
 
@@ -169,10 +171,12 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
                             .addAllMembers(members())
                             .build());
             clock.onReceive(response.getHeader().getLamport());
+            failing.remove(peer);
             retryAfter.remove(peer);
             alive.add(peer);
             return HandshakeResult.OK;
         } catch (StatusRuntimeException e) {
+            failed(peer);
             alive.remove(peer);
             retryAfter.put(peer, System.currentTimeMillis() + RETRY_AFTER_MS);
             return switch (e.getStatus().getCode()) {
@@ -379,11 +383,12 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
         try {
             T response = rpc.apply(stubs.get(peer).withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS));
             clock.onReceive(headerOf.apply(response).getLamport());
-            heard(peer);
+            failing.remove(peer);
             retryAfter.remove(peer);
             if (alive.add(peer)) Log.info("N%d voltou a responder", peer);
             return Optional.of(response);
         } catch (StatusRuntimeException e) {
+            failed(peer);
             boolean wasAlive = alive.remove(peer);
             retryAfter.put(peer, System.currentTimeMillis() + RETRY_AFTER_MS);
             if (wasAlive) {
@@ -412,7 +417,7 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
      */
     public void markAlive(int peer) {
         if (!stubs.containsKey(peer)) return;
-        heard(peer);
+        failing.remove(peer);
         retryAfter.remove(peer);
         if (alive.add(peer)) {
             Log.info("N%d voltou a responder", peer);
@@ -422,22 +427,29 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     }
 
     /**
-     * Detector de falhas com janela: o peer é <b>suspeito</b> só se não houve nenhum contato
-     * bem-sucedido com ele (de ida ou de volta) há mais de {@code suspectAfterMs}.
+     * Detector de falhas com janela: o peer é <b>suspeito</b> só quando as tentativas de contato com
+     * ele <i>falham</i> há mais de {@code suspectAfterMs}, sem nenhum contato bem-sucedido (de ida ou
+     * de volta) entre a primeira e a última falha.
      *
      * <p>Uma falha isolada não basta. O caso que motivou isto: na subida, o canal gRPC para um peer
      * que ainda não estava ouvindo entra em <i>reconnect backoff</i> (~1 s), e toda chamada nesse
      * intervalo falha na hora com UNAVAILABLE — com o peer já vivo. Com "falha = morto", o
      * Ricart-Agrawala contava isso como permissão e dois nós entravam juntos na seção crítica.
+     *
+     * <p>Silêncio também não basta. Dois seguidores só se falam na fase da seção crítica; numa
+     * rodada em que as formigas levam mais que a janela, eles passam a janela inteira sem contato,
+     * os dois vivos. Por isso a janela é medida entre <i>falhas</i>, e não desde o último contato.
      */
     @Override
     public boolean isSuspected(int peer) {
-        Long heard = lastHeard.get(peer);
-        return heard == null || System.currentTimeMillis() - heard > suspectAfterMs;
+        FailureStreak streak = failing.get(peer);
+        return streak != null && streak.last() - streak.since() > suspectAfterMs;
     }
 
-    private void heard(int peer) {
-        lastHeard.put(peer, System.currentTimeMillis());
+    /** Registra uma tentativa de contato que falhou: começa ou estende a sequência de falhas. */
+    private void failed(int peer) {
+        long now = System.currentTimeMillis();
+        failing.merge(peer, new FailureStreak(now, now), (old, fresh) -> new FailureStreak(old.since(), now));
     }
 
     /** false enquanto o peer está em quarentena; depois disso, uma nova tentativa vale a pena. */

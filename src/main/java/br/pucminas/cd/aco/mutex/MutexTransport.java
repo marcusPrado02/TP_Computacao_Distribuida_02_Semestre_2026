@@ -18,7 +18,8 @@ public interface MutexTransport {
 
     /**
      * true se o detector de falhas já <i>suspeita</i> que o peer caiu — só então ele deixa de ser
-     * esperado e conta como permissão. Uma falha isolada de RPC não basta (ver {@code PeerNetwork}).
+     * esperado e conta como permissão. Uma falha isolada de RPC não basta, nem um período sem
+     * contato (ver {@code PeerNetwork}).
      * Padrão: suspeito = fora do conjunto de vivos (comportamento da Entrega 1, usado pelos fakes).
      */
     default boolean isSuspected(int peer) {

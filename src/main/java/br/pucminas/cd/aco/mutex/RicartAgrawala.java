@@ -18,14 +18,15 @@ import java.util.concurrent.Executors;
  *
  * <p>Cada REPLY carrega o timestamp do pedido que autoriza; REPLYs de pedidos antigos são descartados.
  *
- * <p>Tolerância a falhas: um peer só conta como permissão quando o detector de falhas o
- * <b>suspeita</b> ({@link MutexTransport#isSuspected}) — sem contato bem-sucedido há uma janela inteira,
- * não apenas um RPC que falhou. Enquanto não é suspeito, o pedido é reenviado a cada
- * {@link #LIVENESS_POLL_MS}, o que recupera REPLYs perdidos e espera um peer que só estava
- * momentaneamente inacessível (canal gRPC em reconnect backoff, pico de carga). Na Entrega 1, uma
- * falha isolada já valia como permissão, e isso colocava dois nós na seção crítica. A exclusão ainda
- * pode falhar se o peer ficar sem responder a janela inteira e continuar vivo; nesse caso o
- * carimbo de versão da réplica detecta o conflito e as réplicas convergem (ver PheromoneMatrix).
+ * <p>Tolerância a falhas: um peer só conta como permissão quando um REQUEST a ele falha <b>e</b> o
+ * detector de falhas já o <b>suspeita</b> ({@link MutexTransport#isSuspected}) — tentativas de contato
+ * falhando há uma janela inteira, não apenas um RPC que falhou nem um período sem contato. Enquanto
+ * não é suspeito, o pedido é reenviado a cada {@link #LIVENESS_POLL_MS}, o que recupera REPLYs
+ * perdidos e espera um peer que só estava momentaneamente inacessível (canal gRPC em reconnect
+ * backoff, pico de carga). Na Entrega 1, uma falha isolada já valia como permissão, e isso colocava
+ * dois nós na seção crítica. A exclusão ainda pode falhar se o peer ficar sem responder a janela
+ * inteira e continuar vivo; nesse caso o carimbo de versão da réplica detecta o conflito e as
+ * réplicas convergem (ver PheromoneMatrix).
  *
  * <p>Custo: 2(N − 1) mensagens por entrada na seção crítica (N − 1 REQUESTs e N − 1 REPLYs).
  *
@@ -96,10 +97,11 @@ public final class RicartAgrawala implements AutoCloseable {
             try {
                 while (!awaiting.isEmpty()) {
                     wait(LIVENESS_POLL_MS);
-                    // Peer suspeito de ter caído durante a espera nunca vai responder.
-                    awaiting.removeIf(transport::isSuspected);
                     // Reenvia o pedido a quem ainda não respondeu: recupera um REPLY perdido e,
-                    // se o peer morreu depois de receber o REQUEST, a falha do reenvio o remove.
+                    // se o peer morreu depois de receber o REQUEST, a falha do reenvio o remove
+                    // quando ele já for suspeito. Ninguém sai da espera sem REPLY ou sem uma
+                    // tentativa que falhou: o despertar pode ter vindo do REPLY de outro peer,
+                    // com o pedido a este ainda em voo.
                     for (int peer : Set.copyOf(awaiting)) {
                         executor.submit(() -> {
                             if (!transport.sendRequest(peer, ts) && transport.isSuspected(peer)) onReply(peer, ts);

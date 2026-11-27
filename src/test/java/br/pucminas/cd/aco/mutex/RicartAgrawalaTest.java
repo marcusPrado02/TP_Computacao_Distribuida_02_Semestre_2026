@@ -26,7 +26,8 @@ class RicartAgrawalaTest {
 
         @Override public Set<Integer> allPeers() { return Set.copyOf(peers); }
         @Override public Set<Integer> alivePeers() { return Set.copyOf(peers); }
-        @Override public boolean sendRequest(int to, long timestamp) { return true; }
+        /** Peer que saiu de {@code peers} está fora do ar: não confirma o REQUEST. */
+        @Override public boolean sendRequest(int to, long timestamp) { return peers.contains(to); }
         @Override public void sendReply(int to, long requestTs) { repliesSent.add(to); }
     }
 

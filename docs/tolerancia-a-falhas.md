@@ -20,7 +20,7 @@ desempenho** ([`desempenho.md`](desempenho.md)). Este documento cobre a parte de
 
 | # | Falha | Antes (Entrega 1) | Agora | Onde |
 |---|---|---|---|---|
-| F1 | Peer momentaneamente inacessível (canal em backoff, pacote perdido) durante o pedido de SC | uma falha de RPC já contava como permissão → **dois nós na SC** (acontecia na subida do cluster) | só conta como permissão quando o detector **suspeita** do peer: sem nenhum contato bem-sucedido há `max(1,5 s, 3 × RPC_TIMEOUT_MS)`. Até lá o REQUEST é reenviado a cada 500 ms | `PeerNetwork.isSuspected`, `RicartAgrawala.acquire` |
+| F1 | Peer momentaneamente inacessível (canal em backoff, pacote perdido) durante o pedido de SC | uma falha de RPC já contava como permissão → **dois nós na SC** (acontecia na subida do cluster) | só conta como permissão quando um REQUEST falha **e** o detector já **suspeita** do peer: as tentativas de contato com ele falham há mais de `max(1,5 s, 3 × RPC_TIMEOUT_MS)`, sem nenhum contato bem-sucedido no meio. Até lá o REQUEST é reenviado a cada 500 ms. Silêncio sozinho não é suspeita: dois seguidores só se falam na fase da SC e, numa rodada longa, passam a janela inteira sem contato, os dois vivos | `PeerNetwork.isSuspected`, `RicartAgrawala.acquire` |
 | F2 | Peer vivo em quarentena (marcado morto há pouco) | ficava 2 s sem ser contatado, mesmo já falando conosco | **qualquer mensagem recebida** prova que ele está vivo: sai da quarentena e o canal reconecta na hora (`resetConnectBackoff`) | `PeerNetwork.markAlive`, `NodeServiceImpl.receive` |
 | F3 | UPDATE de feromônio atrasado ou fora de ordem | sobrescrevia matriz nova com matriz velha | réplica **versionada**: só aplica carimbo `(versão, escritor)` maior que o local | `PheromoneMatrix.applyIfNewer`, `replica.Version` |
 | F4 | Duas escritas concorrentes (exclusão mútua violada porque o detector errou) | réplicas **divergiam em silêncio** | conflito **detectado** (mesma versão, escritor diferente → log `CONFLITO`) e todas as réplicas **convergem** para o maior carimbo (*last-writer-wins* determinístico). Perde-se um depósito, mas ninguém diverge | `PheromoneMatrix.applyIfNewer` |
@@ -88,11 +88,11 @@ argumento central: o versionamento não substitui a exclusão mútua; ele torna 
 |---|---|
 | `VersionedReplicaTest` (5) | versão avança; UPDATE atrasado rejeitado; matriz inicial de nó reiniciado não apaga progresso; escritas concorrentes detectadas e convergentes; ordem total dos carimbos |
 | `CheckpointTest` (5) | grava/lê; sem arquivo; outra instância ignorada; arquivo truncado ignorado; gravação coalescida pega o estado mais novo |
-| `SuspicionTest` (3) | falha de peer não suspeito **não** é permissão (regressão de F1); peer suspeito deixa de ser esperado; janela do `PeerNetwork` e `markAlive` |
+| `SuspicionTest` (6) | falha de peer não suspeito **não** é permissão (regressão de F1); peer suspeito deixa de ser esperado; janela do `PeerNetwork` (medida entre falhas) e `markAlive`; peer morto custa uma janela e não trava a SC; com peers vivos e gRPC real, depois de 1,7 s de silêncio: peer dentro da SC não sai da espera sem responder, e uma falha isolada não é permissão |
 | `FaultToleranceIntegrationTest` (3) | gRPC real, 3 nós: seguidor cai e volta já sincronizado; líder cai no meio e o novo retoma e conclui com réplicas idênticas; cluster inteiro reinicia do checkpoint e continua da rodada 8 |
 | `ClusterIntegrationTest`, `BroadcastPheromoneTest`, ... | Entrega 1, continuam verdes |
 
-Total: **59 testes** (`mvn test`), 0 conflitos de réplica nos logs da suíte.
+Total: **62 testes** (`mvn test`), 0 conflitos de réplica nos logs da suíte.
 
 ## 7. Demonstração
 
