@@ -392,7 +392,11 @@ cmd_docker() {
   [[ -f $ROOT/.env ]] || { warn "criando .env com token aleatório"; echo "CLUSTER_TOKEN=$(token)" > "$ROOT/.env"; }
   local dc=(docker compose --project-directory "$ROOT")
   case ${1-} in
-    up)    "${dc[@]}" up --build -d && ok "4 nós no Docker. Veja: ./tp docker logs" ;;
+    # Como no "./tp up", cada "docker up" começa do zero: o volume aco-state guarda os checkpoints
+    # e, com os de uma execução anterior, o cluster retomaria da última rodada dela (se ela já
+    # terminou, roda só essa rodada e encerra). "./tp docker start N" reaproveita o checkpoint.
+    up)    "${dc[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+           "${dc[@]}" up --build -d && ok "4 nós no Docker, checkpoints zerados. Veja: ./tp docker logs" ;;
     down)  "${dc[@]}" down ;;
     stop)  "${dc[@]}" stop "node${2:?id}" ;;
     kill)  "${dc[@]}" kill "node${2:?id}" ;;

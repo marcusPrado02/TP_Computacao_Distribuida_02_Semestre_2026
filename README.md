@@ -59,6 +59,10 @@ nesse caso, rode `mvn clean package` antes de executar o JAR para não empacotar
 
 > Um nó que cai e volta (inclusive o líder) sincroniza com o cluster antes de participar, e com
 > `STATE_DIR` também volta do próprio checkpoint. Ver `docs/tolerancia-a-falhas.md`.
+>
+> Os checkpoints ficam no volume `aco-state` e sobrevivem ao `docker compose down`. Um novo
+> `docker compose up` retoma da última rodada gravada: se a execução anterior terminou, roda só essa
+> rodada e encerra. Para começar do zero: `docker compose down -v` (o `./tp docker up` já faz isso).
 
 ## Token do cluster
 

@@ -18,7 +18,7 @@ Sem argumentos ele abre um **menu interativo**, que pergunta os parâmetros e su
 | `./tp timeline [filtro]` | todos os nós numa só linha do tempo, **ordenada pelo relógio de Lamport** |
 | `./tp check` | verifica nos logs que nunca houve dois nós na seção crítica |
 | `./tp demo failover [nós]` / `./tp demo mutex [nós]` | demonstrações roteirizadas (seção 4) |
-| `./tp docker up\|down\|ps\|logs\|stop N\|kill N\|start N` | atalhos do Docker Compose (cria `.env` se faltar) |
+| `./tp docker up\|down\|ps\|logs\|stop N\|kill N\|start N` | atalhos do Docker Compose (cria `.env` se faltar; `up` zera os checkpoints do volume `aco-state`) |
 | `./tp lan <meu_id> <ip1> <ip2> ...` | imprime o comando exato para rodar o nó numa máquina da LAN |
 | `./tp down` / `./tp clean` | derruba o cluster / apaga `.run/` |
 
