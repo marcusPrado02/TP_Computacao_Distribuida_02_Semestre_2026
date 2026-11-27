@@ -5,9 +5,15 @@ x-node: &node
   build: .
   image: aco-node:latest
   restart: "no"
+  # Checkpoint da réplica (Entrega 2): um arquivo por nó (node-<id>.ckpt) no volume compartilhado.
+  # Nó que cai e volta (docker compose start nodeN) ou cluster inteiro reiniciado continua de onde
+  # parou. Zerar: docker compose down -v
+  volumes:
+    - aco-state:/app/state
 
 x-env: &env
   NODE_PORT: "50051"
+  STATE_DIR: "/app/state"
   CLUSTER_TOKEN: "${CLUSTER_TOKEN:?defina CLUSTER_TOKEN no arquivo .env}"
   TSP_CITIES: "60"
   TSP_SEED: "42"
@@ -50,3 +56,6 @@ services:
       <<: *env
       NODE_ID: "4"
       PEERS: "1=node1:50051,2=node2:50051,3=node3:50051"
+
+volumes:
+  aco-state:

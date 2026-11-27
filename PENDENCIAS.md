@@ -265,7 +265,17 @@ Pendente (o que ainda falta para a entrega):
 - [ ] `git status` limpo em cada máquina; `dependency-reduced-pom.xml` e `target/` já estão ignorados.
 - [ ] Anotar versões usadas no relatório: `java -version`, `docker --version`, `docker compose version`.
 
-## 5. Backlog — Entrega 2 (não mexer agora)
+## 5. Backlog — Entrega 2
+
+> **Atualizado em 27/11/2026** (branch `entrega2/tolerancia-falhas`): itens de código tratados —
+> ver [`docs/tolerancia-a-falhas.md`](docs/tolerancia-a-falhas.md) (F1–F13) e
+> [`docs/desempenho.md`](docs/desempenho.md). Feito: falha ≠ permissão (detector por suspeita),
+> rodada retomada na troca de líder, réplicas versionadas + FetchState + catch-up, checkpoint,
+> análise de desempenho 1–4 nós. **Fora do escopo escolhido:** 2PC e mTLS.
+> **Falta (grupo):** ensaio em 4 máquinas físicas, remedir o desempenho na LAN, relatório de 6 páginas
+> e apresentação de 10 min (cada um explicando a sua parte).
+
+Lista original:
 
 Do §6 de `docs/ARQUITETURA.md`:
 

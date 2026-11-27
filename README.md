@@ -5,6 +5,11 @@ Colônia de Formigas (ACO) resolvendo o Caixeiro-Viajante em vários nós Java q
 
 **Entrega 1:** gRPC · eleição de líder (Bully) · relógio lógico (Lamport) · exclusão mútua (Ricart-Agrawala).
 
+**Entrega 2:** tratamento de falhas · controle de réplicas (matriz versionada, transferência de estado,
+checkpoint) · análise de desempenho (cluster × execução numa máquina).
+- Falhas e réplicas: [`docs/tolerancia-a-falhas.md`](docs/tolerancia-a-falhas.md) · demo: `./tp demo recuperacao`
+- Desempenho: [`docs/desempenho.md`](docs/desempenho.md) · reproduzir: `scripts/bench.sh` (ou `./tp bench`)
+
 - **Documentação completa (comece aqui):** [`docs/README.md`](docs/README.md): roteiro de leitura, algoritmos explicados, referência das classes, testes e guia de demonstração
 - Arquitetura e decisões: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md)
 - Enunciado do trabalho: [`docs/ENUNCIADO.md`](docs/ENUNCIADO.md)
@@ -30,6 +35,8 @@ Script com as operações comuns (Linux, macOS, WSL ou Git Bash; precisa de Java
 ./tp timeline cs           # seção crítica de todos os nós, em ordem de Lamport
 ./tp check                 # verifica nos logs que nunca houve 2 nós na seção crítica
 ./tp demo failover         # roteiro automático: elege, derruba o líder, mede a reeleição
+./tp demo recuperacao      # seguidor cai e volta sincronizado; líder cai e o novo retoma a rodada
+./tp bench                 # análise de desempenho: 1..4 nós × execução sequencial
 ./tp down                  # derruba tudo
 ./tp help                  # todos os comandos
 ```
@@ -42,7 +49,7 @@ Tudo roda em containers; não é preciso ter Java/Maven instalado no host.
 
 ```bash
 docker build --target build -t aco-build .
-docker run --rm aco-build mvn -B test   # 43 testes (unitários + integração), ~10 s
+docker run --rm aco-build mvn -B test   # 59 testes (unitários + integração), ~1 min
 docker compose up --build               # cluster de 4 nós
 ```
 
@@ -50,8 +57,8 @@ O JAR `target/aco-node.jar` é gerado dentro do estágio `build` e copiado para 
 Se preferir sem Docker, `mvn test` e `mvn clean package` continuam funcionando (Java 21 + Maven 3.9+);
 nesse caso, rode `mvn clean package` antes de executar o JAR para não empacotar classes velhas.
 
-> Reiniciar um nó que era líder faz ele recomeçar da rodada 1 com a matriz inicial; veja
-> "Limitações conhecidas" em `docs/ARQUITETURA.md` antes de fazer isso na demo.
+> Um nó que cai e volta (inclusive o líder) sincroniza com o cluster antes de participar, e com
+> `STATE_DIR` também volta do próprio checkpoint. Ver `docs/tolerancia-a-falhas.md`.
 
 ## Token do cluster
 
@@ -133,6 +140,8 @@ src/main/java/br/pucminas/cd/aco/
   election/                       Bully + monitor de líder
   mutex/                          Ricart-Agrawala
   aco/      round/                formigas, feromônio · rodadas (líder/trabalhador)
+  replica/                        versão da réplica, snapshot, checkpoint (Entrega 2)
+  bench/                          linha de base sequencial da análise de desempenho
 docker-compose.yml                4 nós por DNS de serviço (uma máquina)
 docker-compose.lan.yml            4 nós por IP fixo (ensaio de LAN)
 docs/LAN.md                       roteiro do teste em máquinas físicas

@@ -23,6 +23,8 @@ Para quem está chegando agora, nesta ordem:
 | 10 | [`classes/`](classes/README.md) | Referência classe por classe (responsabilidade, métodos, thread-safety) |
 | 11 | [`testes.md`](testes.md) | O que cada teste prova e como rodar |
 | 12 | [`guia-de-execucao.md`](guia-de-execucao.md) | Roteiros de demonstração e solução de problemas |
+| 13 | [`tolerancia-a-falhas.md`](tolerancia-a-falhas.md) | **Entrega 2:** falhas tratadas, réplicas versionadas, recuperação, checkpoint |
+| 14 | [`desempenho.md`](desempenho.md) | **Entrega 2:** cluster × execução numa máquina (método, números, leitura) |
 
 ## Por módulo (dono de cada parte)
 

@@ -60,7 +60,10 @@ Toda mensagem carrega `Header { sender_id, lamport }`.
 | `ReplyCS` | nó → solicitante | `request_ts` do pedido autorizado | Ricart-Agrawala |
 | `StartRound` | líder → todos | `round` | Coordenação |
 | `RoundDone` | nó → líder | `round`, `tour`, `length` | Coordenação |
-| `UpdatePheromone` | dono da SC → todos | matriz n×n, melhor rota | ACO |
+| `UpdatePheromone` | dono da SC → todos | matriz n×n, melhor rota, carimbo `(version, writer_id)`; resposta `UpdateReply` diz se aplicou e a versão da réplica | ACO / réplicas |
+| `FetchState` | qualquer nó → peer | resposta: matriz versionada, melhor rota, última rodada vista | Recuperação (Entrega 2) |
+
+`RoundStart` também leva `version` (versão da réplica do líder) para o catch-up de quem está atrás.
 
 ## 5. Requisitos da Entrega 1
 
@@ -137,9 +140,28 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
 - O broadcast da matriz pula peers marcados como inacessíveis; sem isso, toda rodada após uma queda
   custaria `BROADCAST_TIMEOUT_MS`.
 
-## 6. Limitações conhecidas (insumo para a Entrega 2)
+## 5.6 Entrega 2 — tratamento de falhas, réplicas e desempenho
 
-- **Detector de falhas é por timeout e a falha conta como permissão.** Se o peer apenas estava lento
+Resumo (detalhes, motivação e testes em [`tolerancia-a-falhas.md`](tolerancia-a-falhas.md) e
+[`desempenho.md`](desempenho.md)):
+
+- **Réplicas versionadas** (`replica.Version`): cada escrita leva `(versão, escritor)`, uma ordem total;
+  UPDATE velho é rejeitado; escritas concorrentes são detectadas (`CONFLITO`) e convergem por
+  last-writer-wins.
+- **Transferência de estado** (`FetchState`): nó que volta e novo líder pegam o estado mais novo do
+  cluster; réplica atrasada faz catch-up no `StartRound` ou depois do próprio broadcast.
+- **Retomada da rodada** interrompida pela troca de líder (não é mais pulada); `RoundDone` com 3 tentativas.
+- **Detector por suspeita** no Ricart-Agrawala: falha isolada não é permissão; mensagem recebida tira o
+  peer da quarentena e reseta o backoff do canal gRPC.
+- **Checkpoint** atômico em `STATE_DIR` (sobrevive ao reinício do cluster inteiro).
+- **Análise de desempenho:** `bench.SequentialBaseline` + `scripts/bench.sh`; speedup de 2,2× com 4 nós.
+
+## 6. Limitações conhecidas
+
+> Atualizado na Entrega 2. Itens ~~riscados~~ foram tratados; ver [`tolerancia-a-falhas.md`](tolerancia-a-falhas.md) §2.
+
+- ~~Falha isolada conta como permissão~~ → agora só peer **suspeito** (sem contato há uma janela) conta (F1/F2).
+  Continua valendo: **detector de falhas é por timeout.** Se o peer apenas estava lento
   (GC, pico de carga), ele pode entrar na SC ao mesmo tempo que quem o considerou morto. Reproduzido:
   um REQUEST que devolve `false` com o peer vivo coloca os dois na seção crítica. Não existe detector
   perfeito em sistema assíncrono; corrigir exige membership/quórum/consenso.
@@ -148,8 +170,9 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
   o travamento por mais uma chance de violar a exclusão.
 - **Heartbeat só do líder.** Um seguidor que cai é notado quando alguém tenta falar com ele — o probe
   em `awaitRound` encurta isso para o fim da rodada, mas até lá quem espera REPLY dele fica parado.
-- **Rodada perdida na troca de líder é pulada** (o novo líder segue de `lastRound + 1`).
-- **Réplicas sem versão.** A matriz é substituída inteira; um nó que voltou com a matriz inicial pode
+- ~~Rodada perdida na troca de líder é pulada~~ → o novo líder sincroniza e retoma a rodada (F7).
+- ~~Réplicas sem versão~~ → matriz versionada, UPDATE velho rejeitado, nó que volta sincroniza (F3–F6).
+  Texto original: **Réplicas sem versão.** A matriz é substituída inteira; um nó que voltou com a matriz inicial pode
   sobrescrever o progresso de todos. Um UPDATE atrasado (deadline estourado, mas handler executado
   depois) também pode aplicar uma matriz antiga por cima de uma nova. Precisa de epoch/versão e
   reconciliação.
@@ -157,7 +180,8 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
   tentado (sem ser esperado se estiver morto); os demais convergem na próxima atualização. Envios
   em segundo plano para peer dado como morto podem chegar fora de ordem (ver "Réplicas sem versão"). Se o peer só estava lento, fica com a réplica
   atrasada por uma rodada.
-- **Estado de rodada só em memória.** Um líder que reinicia volta a `lastRound = 0`, recomeça em
+- ~~Estado de rodada só em memória~~ → sincronização na subida + checkpoint (F5, F8, F11).
+  Texto original: **Estado de rodada só em memória.** Um líder que reinicia volta a `lastRound = 0`, recomeça em
   `1/ROUNDS` e retransmite a matriz inicial. O `RoundWorker` ignora rodadas repetidas (não refaz a
   SC e responde), mas o líder ainda re-executa as rodadas. Falta transferir estado/catch-up antes
   de assumir.
@@ -176,8 +200,8 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
   o broadcast falha; não há chunking.
 - **Sem TLS.** O token trafega em claro na LAN; um membro com o token pode forjar o `sender_id` de
   outro. A solução completa é mTLS com certificado por nó.
-- **Sem persistência** de matriz, melhor rota ou rodada.
-- Os itens de réplica/consenso acima continuam sendo o escopo natural da Entrega 2.
+- ~~Sem persistência~~ → checkpoint em `STATE_DIR` (F11).
+- Continua em aberto: partição longa com dois lados ativos (precisa de quórum/consenso), TLS.
 
 ## 7. Testes
 
@@ -193,7 +217,12 @@ exclusão mútua; ver §6. O protocolo é *best-effort* sob falhas, não toleran
 | `TspInstanceTest` | TSPLIB válido, outra seção (`DISPLAY_DATA_SECTION`), arquivo vazio, < 3 cidades, linha malformada, vizinho mais próximo |
 | `ClusterIntegrationTest` | 3 nós com gRPC real: elege N3, rodadas, réplicas idênticas, failover do líder, queda de seguidor sem travar, token/remetente recusados |
 
-Total: 43 testes (`mvn test` no container, ~10 s).
+| `VersionedReplicaTest` | versão, UPDATE atrasado rejeitado, conflito detectado e convergente |
+| `CheckpointTest` | persistência atômica, arquivo de outra instância/truncado ignorado |
+| `SuspicionTest` | falha isolada de peer não suspeito não vira permissão (regressão do bug de backoff) |
+| `FaultToleranceIntegrationTest` | nó que volta sincroniza; novo líder retoma e conclui; cluster reinicia do checkpoint |
+
+Total: 59 testes (`mvn test`).
 
 ## 8. Parâmetros (variáveis de ambiente)
 
@@ -213,3 +242,5 @@ Total: 43 testes (`mvn test` no container, ~10 s).
 | `BROADCAST_TIMEOUT_MS` | 2000 | deadline do broadcast da matriz (LAN: 5000) |
 | `COORDINATOR_TIMEOUT_MS` | 3000 | espera pelo `COORDINATOR` na eleição (LAN: 8000) |
 | `PEER_WAIT_MS` | 0 | barreira de subida antes da 1ª rodada; 0 desliga (LAN: 120000) |
+| `STATE_DIR` | — | diretório do checkpoint da réplica (`node-<id>.ckpt`); vazio desliga. Compose: `/app/state` no volume `aco-state` |
+| `ANT_THREADS` | 0 | threads das formigas por nó; 0 = todos os núcleos. Na análise de desempenho, limita cada nó para imitar N máquinas |
