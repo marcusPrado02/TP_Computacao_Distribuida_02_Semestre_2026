@@ -1,0 +1,21 @@
+modo=strong rodadas=20 iterações=500 threads/nó=2 instância=data/berlin52.tsp reps=3 núcleos=16
+  N=1 rep=1 cluster=20902 ms sequencial=20632 ms
+  N=1 rep=2 cluster=21403 ms sequencial=21395 ms
+  N=1 rep=3 cluster=20360 ms sequencial=21020 ms
+  N=2 rep=1 cluster=13234 ms sequencial=21670 ms
+  N=2 rep=2 cluster=12632 ms sequencial=20567 ms
+  N=2 rep=3 cluster=12535 ms sequencial=20868 ms
+  N=3 rep=1 cluster=10851 ms sequencial=22429 ms
+  N=3 rep=2 cluster=10712 ms sequencial=20909 ms
+  N=3 rep=3 cluster=10819 ms sequencial=21324 ms
+  N=4 rep=1 cluster=9623 ms sequencial=20880 ms
+  N=4 rep=2 cluster=9399 ms sequencial=21233 ms
+  N=4 rep=3 cluster=10036 ms sequencial=22064 ms
+
+nos  formigas_por_no  formigas_por_rodada  cluster_ms  sequencial_ms  speedup  eficiencia  ms_por_rodada_cluster  melhor_cluster  melhor_sequencial
+1    160              80000                20902       21020          1.01     1.01        1045.1                 7934            7934
+2    80               80000                12632       20868          1.65     0.82        631.6                  7542            7934
+3    53               79500                10819       21324          1.97     0.66        541.0                  7542            7934
+4    40               80000                9623        21233          2.21     0.55        481.1                  7542            7934
+
+CSV: docs/desempenho/resultados-strong.csv

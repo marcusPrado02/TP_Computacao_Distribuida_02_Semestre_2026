@@ -1,0 +1,5 @@
+nos,formigas_por_no,formigas_por_rodada,cluster_ms,sequencial_ms,speedup,eficiencia,ms_por_rodada_cluster,melhor_cluster,melhor_sequencial
+1,40,20000,5180,5108,0.99,0.99,259.0,8046,8046
+2,40,40000,6336,10797,1.70,0.85,316.8,7542,7542
+3,40,60000,7102,15973,2.25,0.75,355.1,7542,7542
+4,40,80000,9052,20563,2.27,0.57,452.6,7542,7542
