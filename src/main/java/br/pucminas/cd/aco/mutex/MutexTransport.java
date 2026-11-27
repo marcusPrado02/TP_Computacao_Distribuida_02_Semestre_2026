@@ -15,4 +15,13 @@ public interface MutexTransport {
 
     /** Envia REPLY (permissão) ao pedido {@code requestTs} de {@code to}, de forma assíncrona. */
     void sendReply(int to, long requestTs);
+
+    /**
+     * true se o detector de falhas já <i>suspeita</i> que o peer caiu — só então ele deixa de ser
+     * esperado e conta como permissão. Uma falha isolada de RPC não basta (ver {@code PeerNetwork}).
+     * Padrão: suspeito = fora do conjunto de vivos (comportamento da Entrega 1, usado pelos fakes).
+     */
+    default boolean isSuspected(int peer) {
+        return !alivePeers().contains(peer);
+    }
 }

@@ -16,7 +16,12 @@ import br.pucminas.cd.aco.grpc.NodeServiceGrpc.NodeServiceBlockingStub;
 import br.pucminas.cd.aco.grpc.PheromoneUpdate;
 import br.pucminas.cd.aco.grpc.RoundResult;
 import br.pucminas.cd.aco.grpc.RoundStart;
+import br.pucminas.cd.aco.grpc.StateRequest;
+import br.pucminas.cd.aco.grpc.StateSnapshot;
+import br.pucminas.cd.aco.grpc.UpdateReply;
 import br.pucminas.cd.aco.mutex.MutexTransport;
+import br.pucminas.cd.aco.replica.ReplicaSnapshot;
+import br.pucminas.cd.aco.replica.Version;
 import br.pucminas.cd.aco.util.Log;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -64,6 +69,11 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     private static final long HEARTBEAT_MIN_TIMEOUT_MS = 1_000;
     /** Intervalo mínimo antes de tentar de novo um peer que falhou (evita 500 ms por rodada). */
     private static final long RETRY_AFTER_MS = 2_000;
+    /** Tentativas do RoundDone: perder um só faria o líder esperar o timeout da rodada (30 s). */
+    private static final int ROUND_DONE_ATTEMPTS = 3;
+    private static final long ROUND_DONE_BACKOFF_MS = 200;
+    /** Piso da janela de suspeita; o valor efetivo é {@code max(1,5 s, 3 × RPC_TIMEOUT_MS)}. */
+    private static final long SUSPECT_MIN_MS = 1_500;
 
     /** Resultado do handshake de configuração (heartbeat usado como probe no startup). */
     public enum HandshakeResult { OK, UNREACHABLE, AUTH, PEERS, OTHER }
@@ -82,6 +92,10 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
     private final Set<Integer> alive = ConcurrentHashMap.newKeySet();
     /** Instante a partir do qual vale a pena tentar de novo um peer marcado como inacessível. */
     private final Map<Integer, Long> retryAfter = new ConcurrentHashMap<>();
+    /** Último contato bem-sucedido com cada peer (chamada de saída ou mensagem recebida), em ms. */
+    private final Map<Integer, Long> lastHeard = new ConcurrentHashMap<>();
+    /** Sem contato há mais que isto = suspeito de ter caído (ver {@link #isSuspected}). */
+    private final long suspectAfterMs;
     /** Config divergente é erro fatal; o Node instala o handler e encerra o processo. */
     private volatile Consumer<String> configErrorHandler = message -> {};
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -101,6 +115,8 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
         this.fastTimeoutMs = fastTimeoutMs;
         this.broadcastTimeoutMs = broadcastTimeoutMs;
         this.heartbeatTimeoutMs = Math.max(HEARTBEAT_MIN_TIMEOUT_MS, fastTimeoutMs);
+        this.suspectAfterMs = Math.max(SUSPECT_MIN_MS, 3 * fastTimeoutMs);
+        long now = System.currentTimeMillis();
         peers.forEach((id, address) -> {
             ManagedChannel channel = ManagedChannelBuilder.forTarget(address).usePlaintext().build();
             channels.put(id, channel);
@@ -109,6 +125,9 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
                     .withMaxOutboundMessageSize(MAX_MESSAGE_BYTES)
                     .withInterceptors(ClusterAuth.clientInterceptor(clusterToken)));
             alive.add(id);
+            // Começa "ouvido agora": um peer que ainda está subindo tem uma janela inteira para
+            // responder antes de ser dado como morto.
+            lastHeard.put(id, now);
         });
     }
 
@@ -199,8 +218,10 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
 
     @Override
     public boolean sendRequest(int to, long timestamp) {
-        // Peer em quarentena: nem tenta, para o acquire() não pagar o timeout por rodada.
-        if (!shouldContact(to)) return false;
+        // Peer em quarentena e já suspeito: nem tenta, para o acquire() não pagar o timeout por
+        // rodada. Em quarentena mas ainda não suspeito: tenta, porque pode estar vivo (e o REPLY
+        // dele é necessário para a exclusão mútua).
+        if (!shouldContact(to) && isSuspected(to)) return false;
         return ack(to, fastTimeoutMs, s -> s.requestCS(
                 CsRequest.newBuilder().setHeader(header()).setRequestTs(timestamp).build()));
     }
@@ -217,23 +238,75 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
 
     // ---------------------------------------------------------------- Rodadas ACO
 
-    /** Líder avisa todos os peers do início da rodada (assíncrono, não espera os acks). */
-    public void broadcastStartRound(int round) {
+    /**
+     * Líder avisa todos os peers do início da rodada (assíncrono, não espera os acks).
+     * {@code version} é a versão da réplica do líder: quem estiver atrás faz catch-up antes.
+     */
+    public void broadcastStartRound(int round, long version) {
         for (int id : stubs.keySet()) {
             if (!shouldContact(id)) continue;
             executor.submit(() -> ack(id, fastTimeoutMs, s -> s.startRound(
-                    RoundStart.newBuilder().setHeader(header()).setRound(round).build())));
+                    RoundStart.newBuilder().setHeader(header()).setRound(round).setVersion(version).build())));
         }
     }
 
-    /** Informa ao líder a melhor rota local da rodada (síncrono). */
-    public void sendRoundDone(int leader, int round, Tour tour) {
-        ack(leader, fastTimeoutMs, s -> s.roundDone(RoundResult.newBuilder()
-                .setHeader(header())
+    /**
+     * Informa ao líder a melhor rota local da rodada (síncrono), com até 3 tentativas.
+     * Uma perda isolada (pacote, pico de carga) não pode custar ao líder os 30 s do timeout da
+     * rodada; para de tentar se o líder for dado como morto (aí quem assume refaz a rodada).
+     *
+     * @return true se o líder confirmou
+     */
+    public boolean sendRoundDone(int leader, int round, Tour tour) {
+        RoundResult base = RoundResult.newBuilder()
                 .setRound(round)
                 .addAllTour(Protos.boxed(tour.cities()))
                 .setLength(tour.length())
-                .build()));
+                .build();
+        for (int attempt = 1; attempt <= ROUND_DONE_ATTEMPTS; attempt++) {
+            if (ack(leader, fastTimeoutMs, s -> s.roundDone(base.toBuilder().setHeader(header()).build()))) {
+                return true;
+            }
+            if (attempt < ROUND_DONE_ATTEMPTS) {
+                try {
+                    Thread.sleep(ROUND_DONE_BACKOFF_MS * attempt);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+        Log.info("RoundDone da rodada %d não chegou a N%d após %d tentativas", round, leader, ROUND_DONE_ATTEMPTS);
+        return false;
+    }
+
+    // ---------------------------------------------------------------- Réplicas / recuperação
+
+    /** Pede o estado completo a um peer (FetchState). Vazio se ele não respondeu. */
+    public Optional<ReplicaSnapshot> fetchState(int peer) {
+        if (!stubs.containsKey(peer) || !shouldContact(peer)) return Optional.empty();
+        return call(peer, broadcastTimeoutMs,
+                s -> s.fetchState(StateRequest.newBuilder().setHeader(header()).build()),
+                StateSnapshot::getHeader)
+                .map(Protos::snapshot);
+    }
+
+    /** FetchState em paralelo em todos os peers contatáveis; devolve os que responderam. */
+    public List<ReplicaSnapshot> fetchStateFromAll() {
+        List<Future<Optional<ReplicaSnapshot>>> futures = new ArrayList<>();
+        for (int id : stubs.keySet()) futures.add(executor.submit(() -> fetchState(id)));
+        List<ReplicaSnapshot> result = new ArrayList<>();
+        for (Future<Optional<ReplicaSnapshot>> f : futures) {
+            try {
+                f.get().ifPresent(result::add);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (ExecutionException e) {
+                Log.info("Falha no FetchState: %s", e.getCause());
+            }
+        }
+        return result;
     }
 
     /**
@@ -248,32 +321,50 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
      * quarentena ele nem é tentado, exceto o coordenador da rodada, que precisa da matriz e por
      * isso é sempre tentado (mas, morto, também não é esperado: líder que cai no meio da rodada
      * faria cada nó da fila ficar o timeout inteiro na SC, atrasando a 1ª rodada do novo líder).
+     *
+     * <p>Cada réplica responde se aplicou e com qual versão ficou. Se alguma tinha versão
+     * <i>mais nova</i> que a enviada, quem escreveu estava atrasado (ou houve escrita concorrente):
+     * o chamador usa o retorno para fazer catch-up daquela réplica.
+     *
+     * @return id do peer com a réplica mais nova que {@code version}, ou -1 se nenhum
      */
-    public void broadcastPheromone(int round, double[] tau, Tour best, int coordinator) {
+    public int broadcastPheromone(int round, double[] tau, Version version, Tour best, int coordinator) {
         PheromoneUpdate base = PheromoneUpdate.newBuilder()
                 .setRound(round)
                 .addAllTau(Protos.boxed(tau))
                 .addAllBestTour(Protos.boxed(best.cities()))
                 .setBestLength(best.length())
+                .setVersion(version.number())
+                .setWriterId(version.writer())
                 .build();
-        List<Future<Boolean>> pending = new ArrayList<>();
+        Map<Integer, Future<Optional<UpdateReply>>> pending = new HashMap<>();
         for (int id : stubs.keySet()) {
             boolean mustWait = alive.contains(id);
             if (!mustWait && id != coordinator && !shouldContact(id)) continue;
-            Future<Boolean> sent = executor.submit(() -> ack(id, broadcastTimeoutMs,
-                    s -> s.updatePheromone(base.toBuilder().setHeader(header()).build())));
-            if (mustWait) pending.add(sent);
+            Future<Optional<UpdateReply>> sent = executor.submit(() -> call(id, broadcastTimeoutMs,
+                    s -> s.updatePheromone(base.toBuilder().setHeader(header()).build()),
+                    UpdateReply::getHeader));
+            if (mustWait) pending.put(id, sent);
         }
-        for (Future<Boolean> f : pending) {
+        int newerPeer = -1;
+        Version newest = version;
+        for (var entry : pending.entrySet()) {
             try {
-                f.get();
+                Optional<UpdateReply> reply = entry.getValue().get();
+                if (reply.isEmpty() || reply.get().getApplied()) continue;
+                Version theirs = new Version(reply.get().getVersion(), reply.get().getWriterId());
+                if (theirs.isNewerThan(newest)) {
+                    newest = theirs;
+                    newerPeer = entry.getKey();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
+                return newerPeer;
             } catch (ExecutionException e) {
                 Log.info("Falha no broadcast de feromônio: %s", e.getCause());
             }
         }
+        return newerPeer;
     }
 
     // ---------------------------------------------------------------- Infra
@@ -288,6 +379,7 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
         try {
             T response = rpc.apply(stubs.get(peer).withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS));
             clock.onReceive(headerOf.apply(response).getLamport());
+            heard(peer);
             retryAfter.remove(peer);
             if (alive.add(peer)) Log.info("N%d voltou a responder", peer);
             return Optional.of(response);
@@ -308,6 +400,44 @@ public final class PeerNetwork implements MutexTransport, ElectionTransport, Aut
             }
             return Optional.empty();
         }
+    }
+
+    /**
+     * Mensagem recebida de {@code peer} prova que ele está vivo: sai da quarentena na hora.
+     *
+     * <p>Sem isso, só as chamadas <i>de saída</i> atualizavam a visão. Um peer que ainda estava subindo
+     * quando foi testado ficava 2 s em quarentena mesmo já falando conosco, e o Ricart-Agrawala o
+     * contava como permissão: dois nós na seção crítica logo na 1ª rodada (o carimbo de versão
+     * da réplica revelou isso como conflito em v1).
+     */
+    public void markAlive(int peer) {
+        if (!stubs.containsKey(peer)) return;
+        heard(peer);
+        retryAfter.remove(peer);
+        if (alive.add(peer)) {
+            Log.info("N%d voltou a responder", peer);
+            // O canal pode estar em reconnect backoff desde a última falha: reconecta já.
+            channels.get(peer).resetConnectBackoff();
+        }
+    }
+
+    /**
+     * Detector de falhas com janela: o peer é <b>suspeito</b> só se não houve nenhum contato
+     * bem-sucedido com ele (de ida ou de volta) há mais de {@code suspectAfterMs}.
+     *
+     * <p>Uma falha isolada não basta. O caso que motivou isto: na subida, o canal gRPC para um peer
+     * que ainda não estava ouvindo entra em <i>reconnect backoff</i> (~1 s), e toda chamada nesse
+     * intervalo falha na hora com UNAVAILABLE — com o peer já vivo. Com "falha = morto", o
+     * Ricart-Agrawala contava isso como permissão e dois nós entravam juntos na seção crítica.
+     */
+    @Override
+    public boolean isSuspected(int peer) {
+        Long heard = lastHeard.get(peer);
+        return heard == null || System.currentTimeMillis() - heard > suspectAfterMs;
+    }
+
+    private void heard(int peer) {
+        lastHeard.put(peer, System.currentTimeMillis());
     }
 
     /** false enquanto o peer está em quarentena; depois disso, uma nova tentativa vale a pena. */

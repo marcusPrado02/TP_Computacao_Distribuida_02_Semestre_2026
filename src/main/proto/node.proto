@@ -33,7 +33,13 @@ service NodeService {
   // Cada nó -> líder, depois de atualizar o feromônio na seção crítica.
   rpc RoundDone(RoundResult) returns (Ack);
   // Dono da seção crítica -> todos, antes de liberá-la: nova matriz completa.
-  rpc UpdatePheromone(PheromoneUpdate) returns (Ack);
+  // A resposta diz se a réplica aceitou (versão mais nova) e qual versão ela tem.
+  rpc UpdatePheromone(PheromoneUpdate) returns (UpdateReply);
+
+  // --- Controle de réplicas / recuperação (Entrega 2) ---
+  // Qualquer nó -> peer: "me mande seu estado". Usado por quem volta de uma falha, pelo
+  // novo líder antes de continuar as rodadas e por réplica atrasada (catch-up).
+  rpc FetchState(StateRequest) returns (StateSnapshot);
 }
 
 // Presente em toda mensagem: quem enviou e o relógio de Lamport no envio.
@@ -87,6 +93,8 @@ message CsReply {
 message RoundStart {
   Header header = 1;
   int32 round = 2;
+  // Versão da réplica do líder: seguidor com versão menor faz catch-up (FetchState) antes da rodada.
+  int64 version = 3;
 }
 
 // Melhor rota encontrada pelas formigas do nó nesta rodada.
@@ -105,4 +113,31 @@ message PheromoneUpdate {
   repeated double tau = 3;
   repeated int32 best_tour = 4;
   double best_length = 5;
+  // Carimbo da escrita: (version, writer_id) é uma ordem total. A réplica só aplica carimbo maior
+  // que o seu; mesma versão com escritor diferente = duas escritas concorrentes (conflito).
+  int64 version = 6;
+  int32 writer_id = 7;
+}
+
+// applied=false: a réplica já tinha versão igual ou mais nova (version/writer_id dizem qual).
+message UpdateReply {
+  Header header = 1;
+  bool applied = 2;
+  int64 version = 3;
+  int32 writer_id = 4;
+}
+
+message StateRequest {
+  Header header = 1;
+}
+
+// Estado completo de uma réplica: matriz versionada, melhor rota e última rodada vista.
+message StateSnapshot {
+  Header header = 1;
+  int64 version = 2;
+  int32 writer_id = 3;
+  repeated double tau = 4;
+  repeated int32 best_tour = 5;
+  double best_length = 6;
+  int32 last_round = 7;
 }

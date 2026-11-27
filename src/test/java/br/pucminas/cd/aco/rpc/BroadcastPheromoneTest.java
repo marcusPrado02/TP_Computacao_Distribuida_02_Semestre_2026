@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.pucminas.cd.aco.aco.Tour;
 import br.pucminas.cd.aco.clock.LamportClock;
+import br.pucminas.cd.aco.replica.Version;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
@@ -44,13 +45,13 @@ class BroadcastPheromoneTest {
                 Tour best = new Tour(new int[] {0, 1, 2}, 3);
 
                 // 1º broadcast: N2 ainda consta como vivo, então o líder paga o timeout e o marca morto.
-                net.broadcastPheromone(1, tau, best, 1);
+                net.broadcastPheromone(1, tau, Version.INITIAL.next(1), best, 1);
                 assertFalse(net.alivePeers().contains(2), "N2 deveria estar marcado como inacessível");
 
                 Thread.sleep(2_200); // passa a quarentena (2 s)
 
                 long start = System.nanoTime();
-                net.broadcastPheromone(2, tau, best, 1);
+                net.broadcastPheromone(2, tau, new Version(2, 1), best, 1);
                 long elapsedMs = (System.nanoTime() - start) / 1_000_000;
                 assertTrue(elapsedMs < broadcastTimeout / 3,
                         "broadcast esperou o peer morto por " + elapsedMs + " ms");
@@ -58,7 +59,7 @@ class BroadcastPheromoneTest {
                 // Líder que cai no meio da rodada: N2 é o coordenador e está morto. Ainda recebe o
                 // envio (em segundo plano), mas a SC não pode esperar por ele.
                 start = System.nanoTime();
-                net.broadcastPheromone(3, tau, best, 2);
+                net.broadcastPheromone(3, tau, new Version(3, 1), best, 2);
                 elapsedMs = (System.nanoTime() - start) / 1_000_000;
                 assertTrue(elapsedMs < broadcastTimeout / 3,
                         "broadcast esperou o coordenador morto por " + elapsedMs + " ms");
