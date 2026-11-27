@@ -10,6 +10,8 @@ import br.pucminas.cd.aco.config.NodeConfig;
 import br.pucminas.cd.aco.election.BullyElection;
 import br.pucminas.cd.aco.election.LeaderMonitor;
 import br.pucminas.cd.aco.mutex.RicartAgrawala;
+import br.pucminas.cd.aco.replica.Checkpoint;
+import br.pucminas.cd.aco.replica.Version;
 import br.pucminas.cd.aco.round.RoundCoordinator;
 import br.pucminas.cd.aco.round.RoundWorker;
 import br.pucminas.cd.aco.rpc.ClusterAuth;
@@ -53,6 +55,7 @@ public final class Node implements AutoCloseable {
     private final RoundCoordinator coordinator;
     private final RoundWorker worker;
     private final Server server;
+    private final Checkpoint checkpoint; // null sem STATE_DIR
     private volatile boolean closed;
 
     /**
@@ -77,7 +80,7 @@ public final class Node implements AutoCloseable {
 
         // τ0 = 1 / (ρ · L_nn), inicialização usual do MAX-MIN Ant System
         this.pheromone = new PheromoneMatrix(tsp.size(), 1.0 / (cfg.rho() * nearestNeighbor));
-        AntColony colony = new AntColony(tsp, cfg.alpha(), cfg.beta());
+        AntColony colony = new AntColony(tsp, cfg.alpha(), cfg.beta(), cfg.antThreads());
 
         this.network = new PeerNetwork(cfg.nodeId(), clock, cfg.peers(), cfg.clusterToken(),
                 cfg.timeouts().rpcMs(), cfg.timeouts().broadcastMs());
@@ -89,6 +92,12 @@ public final class Node implements AutoCloseable {
         this.coordinator = new RoundCoordinator(cfg, network, best, election::isLeader);
         this.worker = new RoundWorker(cfg, colony, pheromone, best, mutex, network, coordinator);
         coordinator.attach(worker);
+        if (cfg.stateDir() != null) {
+            this.checkpoint = new Checkpoint(Path.of(cfg.stateDir()), cfg.nodeId(), tsp.size(),
+                    nearestNeighbor, worker::snapshot);
+        } else {
+            this.checkpoint = null;
+        }
         election.onLeaderChange(leader -> {
             if (leader == cfg.nodeId()) coordinator.onBecameLeader();
         });
@@ -103,14 +112,31 @@ public final class Node implements AutoCloseable {
                 .build();
     }
 
-    /** Sobe o servidor gRPC, valida a configuração em background e entra no cluster. */
+    /**
+     * Sobe o servidor gRPC, valida a configuração em background e entra no cluster.
+     *
+     * <p>Recuperação (Entrega 2), antes de disputar a liderança:
+     * <ol>
+     *   <li>checkpoint local ({@code STATE_DIR}), se houver — cobre o reinício do cluster inteiro;</li>
+     *   <li>{@code FetchState} em todos os peers — um nó que volta fica com a réplica mais nova
+     *       do cluster em vez da matriz inicial, e com a última rodada vista.</li>
+     * </ol>
+     * Só então entra na eleição: se este nó tiver o maior id, ele assume já sabendo de onde continuar.
+     */
     public void start() throws IOException {
+        if (checkpoint != null) {
+            checkpoint.load().ifPresentOrElse(
+                    s -> worker.install(s, "checkpoint " + checkpoint.file()),
+                    () -> Log.info("Sem checkpoint em %s; começando da matriz inicial", checkpoint.file()));
+            worker.setCheckpoint(checkpoint);
+        }
         server.start();
         var t = cfg.timeouts();
         Log.info("N%d ouvindo na porta %d; peers = %s", cfg.nodeId(), cfg.port(), cfg.peers());
         Log.info("Rede: rpc=%d ms, broadcast=%d ms, eleição=%d ms, espera de peers=%d ms",
                 t.rpcMs(), t.broadcastMs(), t.electionMs(), t.peerWaitMs());
         verifyPeers();
+        if (!cfg.peers().isEmpty()) worker.syncFromCluster();
         monitor.start();
         election.startElection();
     }
@@ -201,6 +227,16 @@ public final class Node implements AutoCloseable {
         return pheromone.flatten();
     }
 
+    /** Versão da réplica local da matriz. */
+    public Version version() {
+        return worker.version();
+    }
+
+    /** Conflitos de escrita (exclusão mútua violada) detectados por esta réplica. */
+    public long replicaConflicts() {
+        return pheromone.conflicts();
+    }
+
     /** Melhor rota conhecida por este nó, ou null se ainda não houve rodada. */
     public Tour best() {
         return best.get();
@@ -219,5 +255,6 @@ public final class Node implements AutoCloseable {
         election.close();
         mutex.close();
         network.close();
+        if (checkpoint != null) checkpoint.close();
     }
 }

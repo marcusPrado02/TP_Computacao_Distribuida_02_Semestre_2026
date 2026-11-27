@@ -65,20 +65,41 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
         }
     }
 
-    /** Laço do líder: dispara rodadas até acabar ou perder a liderança. */
+    /**
+     * Laço do líder: dispara rodadas até acabar ou perder a liderança.
+     *
+     * <p>Ao assumir, o líder primeiro <b>sincroniza</b> com o cluster ({@code FetchState} em todos):
+     * fica com a réplica mais nova e com a maior rodada vista. Depois <b>retoma</b> essa rodada em vez
+     * de pular para a seguinte — se o líder anterior caiu no meio dela, quem não terminou termina, e
+     * quem já terminou só responde (o trabalhador deduplica). Antes, a rodada interrompida era pulada,
+     * e um líder que reiniciava recomeçava da rodada 1 com a matriz inicial.
+     */
     private void loop() {
         try {
             Thread.sleep(cfg.startDelayMs()); // dá tempo dos peers subirem / eleição estabilizar
-            int round = worker.lastRound() + 1; // novo líder continua de onde o anterior parou
-            if (round == 1) awaitAllPeers(); // só na 1ª rodada: em LAN os nós sobem em instantes diferentes
+            if (!isLeader.getAsBoolean()) return;
+            worker.syncFromCluster();
+            if (worker.lastRound() == 0) {
+                // Cluster novo: em LAN os nós sobem em instantes diferentes. Depois da barreira,
+                // sincroniza de novo (num reinício geral com checkpoint, os outros sabem a rodada).
+                awaitAllPeers();
+                worker.syncFromCluster();
+            }
+            int round = Math.max(1, worker.lastRound());
+            if (round > 1) {
+                Log.info("LÍDER: retomando da rodada %d (réplica %s)", round, worker.version());
+            }
+            long startedAt = System.nanoTime();
+            int firstRound = round;
             while (isLeader.getAsBoolean() && round <= cfg.rounds()) {
                 Set<Integer> participants = new HashSet<>(network.alivePeers());
                 participants.add(cfg.nodeId());
                 done.put(round, ConcurrentHashMap.newKeySet());
                 Log.info("LÍDER: iniciando rodada %d/%d com nós %s", round, cfg.rounds(), participants);
 
-                network.broadcastStartRound(round);
-                worker.onStartRound(round, cfg.nodeId());
+                long version = worker.version().number();
+                network.broadcastStartRound(round, version);
+                worker.onStartRound(round, cfg.nodeId(), version);
                 awaitRound(round, participants);
 
                 Tour global = best.get();
@@ -88,6 +109,10 @@ public final class RoundCoordinator implements RoundSink, AutoCloseable {
             }
             if (round > cfg.rounds()) {
                 finished.set(true);
+                long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+                int count = round - firstRound;
+                Log.info("LÍDER: %d rodada(s) em %d ms (%.1f ms/rodada); réplica final %s",
+                        count, elapsedMs, count == 0 ? 0.0 : (double) elapsedMs / count, worker.version());
                 Tour global = best.get();
                 if (global == null) {
                     Log.info("FIM: nenhuma rota recebida");

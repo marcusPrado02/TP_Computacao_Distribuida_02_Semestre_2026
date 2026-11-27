@@ -15,11 +15,17 @@ x-node: &node
   build: .
   image: aco-node:latest
   restart: "no"
+  # Checkpoint da réplica (Entrega 2): um arquivo por nó (node-<id>.ckpt) no volume compartilhado.
+  # Nó que cai e volta (docker compose start nodeN) ou cluster inteiro reiniciado continua de onde
+  # parou. Zerar: docker compose down -v
+  volumes:
+    - aco-state:/app/state
 
 # Tempos maiores que o padrão: em LAN real (Wi-Fi/roteador) 500 ms é apertado e um
 # heartbeat perdido por latência vira eleição desnecessária. Ver docs/LAN.md.
 x-env: &env
   NODE_PORT: "50051"
+  STATE_DIR: "/app/state"
   CLUSTER_TOKEN: "${CLUSTER_TOKEN:?defina CLUSTER_TOKEN (cp .env.example .env ou passe na linha de comando)}"
   TSP_CITIES: "60"
   TSP_SEED: "42"
@@ -88,3 +94,6 @@ services:
     networks:
       aco-lan:
         ipv4_address: 10.213.0.14
+
+volumes:
+  aco-state:

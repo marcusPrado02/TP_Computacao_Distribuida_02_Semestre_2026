@@ -1,6 +1,9 @@
 package br.pucminas.cd.aco.rpc;
 
 import br.pucminas.cd.aco.aco.Tour;
+import br.pucminas.cd.aco.grpc.StateSnapshot;
+import br.pucminas.cd.aco.replica.ReplicaSnapshot;
+import br.pucminas.cd.aco.replica.Version;
 import java.util.Arrays;
 import java.util.List;
 
@@ -27,5 +30,23 @@ final class Protos {
     static Tour tour(List<Integer> cities, double length) {
         if (cities.isEmpty()) return null;
         return new Tour(cities.stream().mapToInt(Integer::intValue).toArray(), length);
+    }
+
+    static ReplicaSnapshot snapshot(StateSnapshot msg) {
+        return new ReplicaSnapshot(new Version(msg.getVersion(), msg.getWriterId()),
+                unboxDoubles(msg.getTauList()), tour(msg.getBestTourList(), msg.getBestLength()),
+                msg.getLastRound());
+    }
+
+    static StateSnapshot.Builder toMessage(ReplicaSnapshot s) {
+        StateSnapshot.Builder b = StateSnapshot.newBuilder()
+                .setVersion(s.version().number())
+                .setWriterId(s.version().writer())
+                .addAllTau(boxed(s.tau()))
+                .setLastRound(s.lastRound());
+        if (s.best() != null) {
+            b.addAllBestTour(boxed(s.best().cities())).setBestLength(s.best().length());
+        }
+        return b;
     }
 }

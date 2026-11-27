@@ -2,6 +2,7 @@ package br.pucminas.cd.aco.aco;
 
 import java.util.Comparator;
 import java.util.SplittableRandom;
+import java.util.concurrent.ForkJoinPool;
 import java.util.stream.IntStream;
 
 /**
@@ -24,8 +25,21 @@ public final class AntColony {
     private final double alpha;
     private final double beta;
     private final double[][] etaPow;
+    /** null = pool comum (todos os núcleos); senão, pool próprio com {@code ANT_THREADS} threads. */
+    private final ForkJoinPool pool;
 
     public AntColony(TspInstance tsp, double alpha, double beta) {
+        this(tsp, alpha, beta, 0);
+    }
+
+    /**
+     * @param threads threads para as formigas; 0 usa todos os núcleos. Limitar serve para a análise
+     *                de desempenho: N nós com T threads cada numa máquina de N·T núcleos imitam
+     *                N máquinas de T núcleos, e a linha de base sequencial usa as mesmas T threads.
+     */
+    public AntColony(TspInstance tsp, double alpha, double beta, int threads) {
+        if (threads < 0) throw new IllegalArgumentException("threads < 0: " + threads);
+        this.pool = threads == 0 ? null : new ForkJoinPool(threads);
         this.tsp = tsp;
         this.alpha = alpha;
         this.beta = beta;
@@ -47,6 +61,12 @@ public final class AntColony {
      * @param seed semente; a mesma semente reproduz exatamente as mesmas rotas
      */
     public Tour runAnts(double[][] tau, int ants, long seed) {
+        if (pool != null) return pool.submit(() -> runAntsHere(tau, ants, seed)).join();
+        return runAntsHere(tau, ants, seed);
+    }
+
+    /** Parallel stream roda no pool de quem chama: o comum, ou o próprio se chamado de dentro dele. */
+    private Tour runAntsHere(double[][] tau, int ants, long seed) {
         return IntStream.range(0, ants)
                 .parallel()
                 .mapToObj(a -> buildTour(tau, new SplittableRandom(seed * 31 + a)))

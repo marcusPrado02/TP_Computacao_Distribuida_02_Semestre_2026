@@ -29,7 +29,9 @@ public record NodeConfig(
         double beta,
         double rho,
         long startDelayMs,
-        Timeouts timeouts) {
+        Timeouts timeouts,
+        String stateDir,
+        int antThreads) {
 
     /**
      * Normaliza e valida os valores.
@@ -49,9 +51,12 @@ public record NodeConfig(
      * @param beta         peso da visibilidade 1/d (BETA)
      * @param rho          taxa de evaporação em (0, 1] (RHO)
      * @param startDelayMs espera do líder antes da primeira rodada (START_DELAY_MS)
+     * @param stateDir     diretório do checkpoint da réplica (STATE_DIR); null desliga a persistência
+     * @param antThreads   threads das formigas neste nó (ANT_THREADS); 0 = todos os núcleos
      */
     public NodeConfig {
         if (tspFile != null && tspFile.isBlank()) tspFile = null; // TSP_FILE="" = não definido
+        if (stateDir != null && stateDir.isBlank()) stateDir = null;
         if (timeouts == null) timeouts = Timeouts.defaults();
         require(nodeId > 0, "NODE_ID deve ser positivo (o Bully compara ids)");
         require(port > 0 && port <= 65_535, "NODE_PORT fora do intervalo 1–65535: " + port);
@@ -65,7 +70,22 @@ public record NodeConfig(
         require(alpha >= 0 && beta >= 0, "ALPHA e BETA devem ser >= 0");
         require(rho > 0 && rho <= 1, "RHO deve estar em (0, 1]");
         require(startDelayMs >= 0, "START_DELAY_MS deve ser >= 0");
+        require(antThreads >= 0, "ANT_THREADS deve ser >= 0 (0 = todos os núcleos)");
         peers = Collections.unmodifiableMap(new LinkedHashMap<>(peers));
+    }
+
+    /** Sem checkpoint e com todos os núcleos (comportamento da Entrega 1). */
+    public NodeConfig(int nodeId, int port, Map<Integer, String> peers, String clusterToken, String tspFile,
+                      int tspCities, long tspSeed, int rounds, int ants, int iterationsPerRound, double alpha,
+                      double beta, double rho, long startDelayMs, Timeouts timeouts) {
+        this(nodeId, port, peers, clusterToken, tspFile, tspCities, tspSeed, rounds, ants, iterationsPerRound,
+                alpha, beta, rho, startDelayMs, timeouts, null, 0);
+    }
+
+    /** Mesma configuração com outro diretório de checkpoint (testes de recuperação). */
+    public NodeConfig withStateDir(String dir) {
+        return new NodeConfig(nodeId, port, peers, clusterToken, tspFile, tspCities, tspSeed, rounds, ants,
+                iterationsPerRound, alpha, beta, rho, startDelayMs, timeouts, dir, antThreads);
     }
 
     /** Mesma configuração com {@code iterationsPerRound = 1} (comportamento anterior ao parâmetro). */
@@ -97,7 +117,9 @@ public record NodeConfig(
                         parse("RPC_TIMEOUT_MS", env("RPC_TIMEOUT_MS", "500"), Long::parseLong),
                         parse("BROADCAST_TIMEOUT_MS", env("BROADCAST_TIMEOUT_MS", "2000"), Long::parseLong),
                         parse("COORDINATOR_TIMEOUT_MS", env("COORDINATOR_TIMEOUT_MS", "3000"), Long::parseLong),
-                        parse("PEER_WAIT_MS", env("PEER_WAIT_MS", "0"), Long::parseLong)));
+                        parse("PEER_WAIT_MS", env("PEER_WAIT_MS", "0"), Long::parseLong)),
+                System.getenv("STATE_DIR"),
+                parse("ANT_THREADS", env("ANT_THREADS", "0"), Integer::parseInt));
     }
 
     /**

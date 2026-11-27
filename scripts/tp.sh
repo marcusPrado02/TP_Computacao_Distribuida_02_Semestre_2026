@@ -107,7 +107,7 @@ start_node() {
   printf '\n--- (re)início %s ---\n' "$(date +%T)" >> "$LOGS/n$id.log"
   env NODE_ID="$id" NODE_PORT="$(port_of "$id")" PEERS="$(peers_of "$id")" CLUSTER_TOKEN="$TOKEN" \
       ROUNDS="$ROUNDS" ANTS="$ANTS" ITERATIONS_PER_ROUND="${ITERS:-1}" TSP_CITIES="$CITIES" TSP_SEED="$SEED" TSP_FILE="$TSP_FILE" \
-      START_DELAY_MS="$DELAY" \
+      START_DELAY_MS="$DELAY" STATE_DIR="$RUN/state" \
       nohup java -jar "$JAR" >> "$LOGS/n$id.log" 2>&1 &
   echo $! > "$RUN/n$id.pid"
   disown "$!" # sem aviso "Killed" do bash quando o nó for derrubado
@@ -146,7 +146,9 @@ cmd_up() {
   # opções recém-lidas (NODES, ROUNDS...) com as do "up" anterior.
   if [[ -f $STATE ]]; then (cmd_down quiet); fi
   ensure_jar
-  rm -rf "$LOGS"; mkdir -p "$LOGS"
+  # Checkpoints de um "up" anterior seriam de outros parâmetros: cada "up" começa do zero,
+  # mas "./tp start N" (religar um nó) reaproveita o checkpoint dele.
+  rm -rf "$LOGS" "$RUN/state"; mkdir -p "$LOGS"
   TOKEN=$(token)
   # Atribuições simples (não "declare -p"): ao fazer source dentro de uma função, declare criaria locais
   local v
@@ -217,6 +219,7 @@ filter_regex() {
     eleicao)    echo 'Eleição|líder|COORDINATOR|contestando|heartbeat|CAIU' ;;
     rodada)     echo 'LÍDER|Rodada|FIM' ;;
     rede)       echo 'inacessível|voltou a responder|Falha' ;;
+    replica)    echo 'Sincronização|Réplica atualizada|retomando|catch-up|CONFLITO|ignorado|FetchState|checkpoint|CAIU' ;;
     *)          echo "$1" ;;
   esac
 }
@@ -338,11 +341,47 @@ demo_mutex() {
   cmd_down
 }
 
+current_round() { last_match "$1" 'Rodada [0-9]+'; }
+round_at_least() { local r; r=$(current_round "$1"); [[ -n $r ]] && ((r >= $2)); }
+
+# Tratamento de falhas da Entrega 2: seguidor cai e volta (recupera o estado do cluster),
+# depois o líder cai no meio (o novo líder sincroniza e retoma a rodada interrompida).
+demo_recuperacao() {
+  info "Demo: recuperação de falhas (réplicas versionadas + transferência de estado + checkpoint)"
+  cmd_up -n "${1:-4}" -r 400 -a 40 -i 100 -f "$ROOT/data/berlin52.tsp" -d 2000
+  load_state
+  wait_until 30 "todos elegerem N$NODES" all_alive_see_leader "$NODES"
+  wait_until 60 "rodada 8" round_at_least "$NODES" 8
+
+  printf '\n%s1) Seguidor N1 cai (crash) e volta%s\n' "$B" "$RST"
+  cmd_kill 1
+  local r0; r0=$(current_round "$NODES")
+  wait_until 60 "o cluster andar 5 rodadas sem N1" round_at_least "$NODES" $((r0 + 5))
+  cmd_start 1
+  wait_until 30 "N1 voltar a participar" round_at_least 1 $((r0 + 6))
+  grep -hE 'checkpoint|Sincronização|Réplica atualizada' "$LOGS/n1.log" | tail -4 | cut -c1-150
+  ok "N1 caiu na rodada ~$r0 e voltou já sincronizado (não recomeçou da matriz inicial)"
+
+  printf '\n%s2) Líder N%s cai no meio da execução%s\n' "$B" "$NODES" "$RST"
+  cmd_kill "$NODES"
+  wait_until 40 "nova eleição" all_alive_see_leader "$((NODES - 1))"
+  wait_until 30 "o novo líder retomar" grep -q "retomando da rodada" "$LOGS/n$((NODES - 1)).log"
+  grep -hE 'retomando da rodada|Sincronização' "$LOGS/n$((NODES - 1)).log" | tail -2 | cut -c1-150
+  ok "N$((NODES - 1)) assumiu e retomou a rodada interrompida em vez de pulá-la"
+
+  printf '\n%s3) Integridade%s\n' "$B" "$RST"
+  cmd_check || true
+  local conflicts; conflicts=$(cat "$LOGS"/n*.log | grep -c 'CONFLITO' || true)
+  ok "Conflitos de réplica detectados: $conflicts (escritas concorrentes sobre a mesma versão)"
+  printf '%sCluster continua rodando. Veja ./tp timeline replica; encerre com ./tp down%s\n' "$DIM" "$RST"
+}
+
 cmd_demo() {
   case ${1-} in
-    failover) demo_failover "${2-}" ;;
-    mutex)    demo_mutex "${2-}" ;;
-    *) die "uso: ./tp demo failover|mutex [nós]" ;;
+    failover)   demo_failover "${2-}" ;;
+    mutex)      demo_mutex "${2-}" ;;
+    recuperacao|recovery) demo_recuperacao "${2-}" ;;
+    *) die "uso: ./tp demo failover|mutex|recuperacao [nós]" ;;
   esac
 }
 
@@ -353,7 +392,11 @@ cmd_docker() {
   [[ -f $ROOT/.env ]] || { warn "criando .env com token aleatório"; echo "CLUSTER_TOKEN=$(token)" > "$ROOT/.env"; }
   local dc=(docker compose --project-directory "$ROOT")
   case ${1-} in
-    up)    "${dc[@]}" up --build -d && ok "4 nós no Docker. Veja: ./tp docker logs" ;;
+    # Como no "./tp up", cada "docker up" começa do zero: o volume aco-state guarda os checkpoints
+    # e, com os de uma execução anterior, o cluster retomaria da última rodada dela (se ela já
+    # terminou, roda só essa rodada e encerra). "./tp docker start N" reaproveita o checkpoint.
+    up)    "${dc[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+           "${dc[@]}" up --build -d && ok "4 nós no Docker, checkpoints zerados. Veja: ./tp docker logs" ;;
     down)  "${dc[@]}" down ;;
     stop)  "${dc[@]}" stop "node${2:?id}" ;;
     kill)  "${dc[@]}" kill "node${2:?id}" ;;
@@ -450,7 +493,7 @@ ${B}Cluster local${RST} (processos Java nesta máquina; estado em .run/)
   status                        nós vivos, líder visto, rodada e relógio de cada um
   kill <id> [TERM]              derruba um nó (padrão: SIGKILL = crash)
   start <id>                    religa um nó com os mesmos parâmetros
-  logs [id] [filtro] [-f]       logs por hora; filtros: cs, eleicao, rodada, rede ou regex
+  logs [id] [filtro] [-f]       logs por hora; filtros: cs, eleicao, rodada, rede, replica ou regex
   timeline [filtro]             todos os nós ordenados pelo relógio de Lamport
   check                         verifica nos logs que nunca houve 2 nós na seção crítica
   down                          derruba todos os nós
@@ -458,6 +501,8 @@ ${B}Cluster local${RST} (processos Java nesta máquina; estado em .run/)
 ${B}Demonstrações${RST}
   demo failover [nós]           elege, derruba o líder, mede a reeleição, religa
   demo mutex [nós]              roda algumas rodadas e mostra a seção crítica em ordem de Lamport
+  demo recuperacao [nós]        seguidor cai e volta sincronizado; líder cai e o novo retoma a rodada
+  bench                         análise de desempenho: cluster 1..4 nós x sequencial (scripts/bench.sh)
 
 ${B}Outros${RST}
   docker up|down|ps|logs|stop N|kill N|start N    atalhos do Docker Compose
@@ -489,6 +534,7 @@ main() {
     timeline)  cmd_timeline "$@" ;;
     check)     cmd_check ;;
     demo)      cmd_demo "$@" ;;
+    bench)     ensure_jar; "$ROOT/scripts/bench.sh" ;;
     docker)    cmd_docker "$@" ;;
     lan)       cmd_lan "$@" ;;
     token)     token; echo ;;

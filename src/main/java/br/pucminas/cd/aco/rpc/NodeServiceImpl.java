@@ -14,6 +14,11 @@ import br.pucminas.cd.aco.grpc.NodeServiceGrpc;
 import br.pucminas.cd.aco.grpc.PheromoneUpdate;
 import br.pucminas.cd.aco.grpc.RoundResult;
 import br.pucminas.cd.aco.grpc.RoundStart;
+import br.pucminas.cd.aco.grpc.StateRequest;
+import br.pucminas.cd.aco.grpc.StateSnapshot;
+import br.pucminas.cd.aco.grpc.UpdateReply;
+import br.pucminas.cd.aco.aco.PheromoneMatrix;
+import br.pucminas.cd.aco.replica.Version;
 import br.pucminas.cd.aco.mutex.RicartAgrawala;
 import br.pucminas.cd.aco.round.RoundSink;
 import br.pucminas.cd.aco.round.RoundWorker;
@@ -116,7 +121,7 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     @Override
     public void startRound(RoundStart req, StreamObserver<Ack> obs) {
         int from = receive(req.getHeader());
-        worker.onStartRound(req.getRound(), from);
+        worker.onStartRound(req.getRound(), from, req.getVersion());
         ack(obs);
     }
 
@@ -128,11 +133,27 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
     }
 
     @Override
-    public void updatePheromone(PheromoneUpdate req, StreamObserver<Ack> obs) {
+    public void updatePheromone(PheromoneUpdate req, StreamObserver<UpdateReply> obs) {
         receive(req.getHeader());
-        worker.onPheromoneUpdate(req.getRound(), Protos.unboxDoubles(req.getTauList()),
+        PheromoneMatrix.Applied result = worker.onPheromoneUpdate(req.getRound(),
+                Protos.unboxDoubles(req.getTauList()), new Version(req.getVersion(), req.getWriterId()),
                 Protos.tour(req.getBestTourList(), req.getBestLength()));
-        ack(obs);
+        obs.onNext(UpdateReply.newBuilder()
+                .setHeader(network.header())
+                .setApplied(result.applied())
+                .setVersion(result.local().number())
+                .setWriterId(result.local().writer())
+                .build());
+        obs.onCompleted();
+    }
+
+    @Override
+    public void fetchState(StateRequest req, StreamObserver<StateSnapshot> obs) {
+        int from = receive(req.getHeader());
+        var snapshot = worker.snapshot();
+        Log.info("FetchState de N%d: enviando %s, rodada %d", from, snapshot.version(), snapshot.lastRound());
+        obs.onNext(Protos.toMessage(snapshot).setHeader(network.header()).build());
+        obs.onCompleted();
     }
 
     /** Valida o remetente e aplica a regra de recebimento do Lamport. @return id do remetente */
@@ -143,6 +164,7 @@ public final class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase {
                     .asRuntimeException();
         }
         clock.onReceive(header.getLamport());
+        network.markAlive(header.getSenderId()); // quem fala conosco está vivo (detector de falhas)
         return header.getSenderId();
     }
 
